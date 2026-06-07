@@ -1,16 +1,50 @@
-# React + Vite
+# CampusClimb 🏫🗺️
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+[![Version](https://img.shields.io/badge/CampusClimb-v1.0.0-14b8a6?style=for-the-badge&logo=react)](https://github.com/rahul05au/CampusClimb)
+[![Build Status](https://img.shields.io/badge/Build-Passing-22c55e?style=for-the-badge)](https://github.com/rahul05au/CampusClimb)
+[![License](https://img.shields.io/badge/License-MIT-f97316?style=for-the-badge)](https://github.com/rahul05au/CampusClimb/blob/main/LICENSE)
 
-Currently, two official plugins are available:
+A premium, interactive college/university campus navigation and exploration guide built with **React** and **Vite**.
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Oxc](https://oxc.rs)
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/)
+## 🚀 Features
 
-## React Compiler
+- 🗺️ **Interactive Campus Blueprint**: A fully clickable 2D SVG map showing building layouts, locations, and live details.
+- 🏢 **Dynamic Building Status & Stats**: View real-time crowdedness, opening hours, popular spots, and features for each building.
+- 🚶 **Guided Virtual Tour**: Stepper-based showcase for freshmen and visitors to tour the campus landmarks.
+- 🚰 **Utility & Amenity Finder**: Filter and search for restrooms, water dispensers, Wi-Fi zones, and security points.
+- 🚌 **Transit Loop & Event Feed**: Track the live campus shuttle and view upcoming sports, cultural, and technical events.
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+## 🛠️ Tech Stack
 
-## Expanding the ESLint configuration
+- **Core**: React.js, Vite
+- **Styling**: Pure CSS (Glassmorphic theme with modern dark/light system)
+- **Icons**: Custom inline SVGs & Emojis
 
-If you are developing a production application, we recommend using TypeScript with type-aware lint rules enabled. Check out the [TS template](https://github.com/vitejs/vite/tree/main/packages/create-vite/template-react-ts) for information on how to integrate TypeScript and [`typescript-eslint`](https://typescript-eslint.io) in your project.
+## 📦 Getting Started
+
+### Prerequisites
+
+Ensure you have **Node.js** installed on your system.
+
+### Installation
+
+1. Clone the repository:
+   ```bash
+   git clone https://github.com/rahul05au/CampusClimb.git
+   ```
+2. Navigate to the project directory:
+   ```bash
+   cd CampusClimb
+   ```
+3. Install dependencies:
+   ```bash
+   npm install
+   ```
+4. Start the local development server:
+   ```bash
+   npm run dev
+   ```
+
+## 📄 License
+
+This project is licensed under the MIT License.

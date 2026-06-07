@@ -15,9 +15,6 @@ const ToolsIcon = () => (
 const TruckIcon = () => (
   <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="1" y="3" width="15" height="13"></rect><polygon points="16 8 20 8 23 11 23 16 16 16 16 8"></polygon><circle cx="5.5" cy="18.5" r="2.5"></circle><circle cx="18.5" cy="18.5" r="2.5"></circle></svg>
 );
-const ShieldIcon = () => (
-  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path></svg>
-);
 
 const BUILDINGS = [
   {
@@ -172,19 +169,44 @@ const EVENTS = [
   { id: 4, name: 'Graduate Career Fair', time: 'June 8, 09:00 AM', type: 'Technical', location: 'Admin Hub Conference Hall', status: 'Registering' }
 ];
 
+const SHUTTLE_ROUTES = {
+  inner: {
+    name: 'Inner Loop (Academic)',
+    stops: ['Admin Hub', 'Library', 'Pavilion', 'Labs'],
+    positions: [20, 40, 60, 80]
+  },
+  outer: {
+    name: 'Outer Loop (Residential)',
+    stops: ['Main Gate', 'Hostels', 'Sports Complex', 'Pavilion'],
+    positions: [10, 35, 65, 90]
+  },
+  express: {
+    name: 'Express Line (Main to Labs)',
+    stops: ['Main Gate', 'Library', 'Labs'],
+    positions: [15, 50, 85]
+  }
+};
+
 function App() {
   const [activeTab, setActiveTab] = useState('map');
   const [selectedBuilding, setSelectedBuilding] = useState(BUILDINGS[0]);
+  const [mapCategoryFilter, setMapCategoryFilter] = useState('all');
   const [tourStep, setTourStep] = useState(0);
   const [utilityFilter, setUtilityFilter] = useState('all');
   const [utilitySearch, setUtilitySearch] = useState('');
+  
+  // Transit & Events states
+  const [shuttleRouteKey, setShuttleRouteKey] = useState('inner');
   const [shuttleCountdown, setShuttleCountdown] = useState(8);
+  const [selectedEventForBooking, setSelectedEventForBooking] = useState(null);
+  const [bookingForm, setBookingForm] = useState({ name: '', studentId: '', dept: 'Computer Science' });
+  const [bookedTicket, setBookedTicket] = useState(null);
 
   // Shuttle countdown simulation
   useEffect(() => {
     const interval = setInterval(() => {
-      setShuttleCountdown(prev => (prev <= 1 ? 12 : prev - 1));
-    }, 60000); // decrement every minute
+      setShuttleCountdown(prev => (prev <= 1 ? 10 : prev - 1));
+    }, 60000); 
     return () => clearInterval(interval);
   }, []);
 
@@ -195,6 +217,32 @@ function App() {
                           item.locationHint.toLowerCase().includes(utilitySearch.toLowerCase());
     return matchesFilter && matchesSearch;
   });
+
+  const handleBookingSubmit = (e) => {
+    e.preventDefault();
+    if (!bookingForm.name || !bookingForm.studentId) return;
+
+    // Generate simulated ticket
+    const ticketId = `CC-${selectedEventForBooking.type.substring(0,2).toUpperCase()}-${Math.floor(1000 + Math.random() * 9000)}`;
+    const seatNo = `${String.fromCharCode(65 + Math.floor(Math.random() * 8))}-${Math.floor(1 + Math.random() * 30)}`;
+
+    setBookedTicket({
+      id: ticketId,
+      eventName: selectedEventForBooking.name,
+      eventTime: selectedEventForBooking.time,
+      eventLocation: selectedEventForBooking.location,
+      userName: bookingForm.name,
+      userStudentId: bookingForm.studentId,
+      userDept: bookingForm.dept,
+      seat: seatNo
+    });
+  };
+
+  const handleCloseBooking = () => {
+    setSelectedEventForBooking(null);
+    setBookedTicket(null);
+    setBookingForm({ name: '', studentId: '', dept: 'Computer Science' });
+  };
 
   return (
     <div className="app-container">
@@ -258,7 +306,7 @@ function App() {
           <div className="stat-icon-wrapper purple">🚌</div>
           <div className="stat-info">
             <span className="stat-value">In {shuttleCountdown} mins</span>
-            <span className="stat-label">Next Campus Shuttle</span>
+            <span className="stat-label">Next Shuttle ({shuttleRouteKey})</span>
           </div>
         </div>
         <div className="stat-card">
@@ -275,59 +323,82 @@ function App() {
         {activeTab === 'map' && (
           <div className="map-guide-layout">
             {/* Left side: Interactive Map */}
-            <div className="map-canvas-container">
-              <svg className="map-svg" viewBox="0 0 750 500">
-                {/* Roads / Paths */}
-                <path d="M 50,220 L 700,220" stroke="var(--border)" strokeWidth="8" strokeDasharray="5,5" fill="none" />
-                <path d="M 390,50 L 390,450" stroke="var(--border)" strokeWidth="8" strokeDasharray="5,5" fill="none" />
-                <path d="M 150,220 L 150,120 L 390,120" stroke="var(--border)" strokeWidth="4" fill="none" />
-                <path d="M 550,220 L 550,150 L 390,150" stroke="var(--border)" strokeWidth="4" fill="none" />
-                
-                {/* Central Plaza Circular Lawn */}
-                <circle cx="390" cy="220" r="45" fill="var(--accent-bg)" stroke="var(--accent-border)" strokeWidth="2" />
-                <text x="390" y="223" className="map-label" style={{fill: 'var(--accent)', fontSize: '10px'}}>CENTRAL PLAZA</text>
-
-                {/* Buildings SVG Rendering */}
-                {BUILDINGS.map((building) => (
-                  <g 
-                    key={building.id} 
-                    className={`map-building-group ${selectedBuilding?.id === building.id ? 'active' : ''}`}
-                    onClick={() => setSelectedBuilding(building)}
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+              <div className="utility-filters" style={{ justifyContent: 'flex-start' }}>
+                {[
+                  { key: 'all', label: 'All Buildings' },
+                  { key: 'Academic', label: '📖 Academic' },
+                  { key: 'Social', label: '🍔 Social/Dining' },
+                  { key: 'Recreation', label: '🏃 Recreation' },
+                  { key: 'Residential', label: '🏠 Residence' }
+                ].map(item => (
+                  <button 
+                    key={item.key}
+                    className={`filter-chip ${mapCategoryFilter === item.key ? 'active' : ''}`}
+                    onClick={() => setMapCategoryFilter(item.key)}
                   >
-                    <rect 
-                      x={building.x} 
-                      y={building.y} 
-                      width={building.w} 
-                      height={building.h} 
-                      rx="12" 
-                      className="map-building-path" 
-                    />
-                    <text 
-                      x={building.x + building.w/2} 
-                      y={building.y + building.h/2 - 5} 
-                      className="map-label"
-                    >
-                      {building.name.split(' ')[0]}
-                    </text>
-                    <text 
-                      x={building.x + building.w/2} 
-                      y={building.y + building.h/2 + 12} 
-                      className="map-label" 
-                      style={{fontSize: '9px', fill: 'var(--text-muted)'}}
-                    >
-                      ({building.code})
-                    </text>
-                    
-                    {/* Active Selection Pin */}
-                    {selectedBuilding?.id === building.id && (
-                      <path 
-                        d={`M ${building.x + building.w/2} ${building.y - 12} L ${building.x + building.w/2 - 6} ${building.y - 24} A 6 6 0 1 1 ${building.x + building.w/2 + 6} ${building.y - 24} Z`} 
-                        className="map-pin" 
-                      />
-                    )}
-                  </g>
+                    {item.label}
+                  </button>
                 ))}
-              </svg>
+              </div>
+
+              <div className="map-canvas-container">
+                <svg className="map-svg" viewBox="0 0 750 500">
+                  {/* Roads / Paths */}
+                  <path d="M 50,220 L 700,220" stroke="var(--border)" strokeWidth="8" strokeDasharray="5,5" fill="none" />
+                  <path d="M 390,50 L 390,450" stroke="var(--border)" strokeWidth="8" strokeDasharray="5,5" fill="none" />
+                  <path d="M 150,220 L 150,120 L 390,120" stroke="var(--border)" strokeWidth="4" fill="none" />
+                  <path d="M 550,220 L 550,150 L 390,150" stroke="var(--border)" strokeWidth="4" fill="none" />
+                  
+                  {/* Central Plaza Circular Lawn */}
+                  <circle cx="390" cy="220" r="45" fill="var(--accent-bg)" stroke="var(--accent-border)" strokeWidth="2" />
+                  <text x="390" y="223" className="map-label" style={{fill: 'var(--accent)', fontSize: '10px'}}>CENTRAL PLAZA</text>
+
+                  {/* Buildings SVG Rendering */}
+                  {BUILDINGS.map((building) => {
+                    const isFilteredOut = mapCategoryFilter !== 'all' && building.type !== mapCategoryFilter;
+                    return (
+                      <g 
+                        key={building.id} 
+                        className={`map-building-group ${selectedBuilding?.id === building.id ? 'active' : ''} ${isFilteredOut ? 'dimmed' : ''}`}
+                        onClick={() => !isFilteredOut && setSelectedBuilding(building)}
+                      >
+                        <rect 
+                          x={building.x} 
+                          y={building.y} 
+                          width={building.w} 
+                          height={building.h} 
+                          rx="12" 
+                          className="map-building-path" 
+                        />
+                        <text 
+                          x={building.x + building.w/2} 
+                          y={building.y + building.h/2 - 5} 
+                          className="map-label"
+                        >
+                          {building.name.split(' ')[0]}
+                        </text>
+                        <text 
+                          x={building.x + building.w/2} 
+                          y={building.y + building.h/2 + 12} 
+                          className="map-label" 
+                          style={{fontSize: '9px', fill: 'var(--text-muted)'}}
+                        >
+                          ({building.code})
+                        </text>
+                        
+                        {/* Active Selection Pin */}
+                        {selectedBuilding?.id === building.id && (
+                          <path 
+                            d={`M ${building.x + building.w/2} ${building.y - 12} L ${building.x + building.w/2 - 6} ${building.y - 24} A 6 6 0 1 1 ${building.x + building.w/2 + 6} ${building.y - 24} Z`} 
+                            className="map-pin" 
+                          />
+                        )}
+                      </g>
+                    );
+                  })}
+                </svg>
+              </div>
             </div>
 
             {/* Right side: Building Details Panel */}
@@ -402,7 +473,7 @@ function App() {
                 <div className="sidebar-placeholder">
                   <div className="pulse-circle">📍</div>
                   <h3>Select a Building</h3>
-                  <p>Click on any building on the campus blueprint map to view its live statistics, opening hours, popular student corners, and features.</p>
+                  <p>Click on any highlighted building on the map blueprint to view live stats, facilities, and occupancies.</p>
                 </div>
               )}
             </div>
@@ -539,6 +610,14 @@ function App() {
                         ● {event.status}
                       </span>
                     </div>
+                    
+                    <button 
+                      className="filter-chip active"
+                      style={{ marginTop: '12px', width: 'fit-content', padding: '6px 12px', fontSize: '11px' }}
+                      onClick={() => setSelectedEventForBooking(event)}
+                    >
+                      🎟️ Book Pass / Reserve Seat
+                    </button>
                   </div>
                 ))}
               </div>
@@ -546,29 +625,54 @@ function App() {
 
             {/* Shuttle tracker column */}
             <div>
-              <h2 className="panel-section-title">🚌 Live Shuttle Loop</h2>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
+                <h2 className="panel-section-title" style={{ margin: 0 }}>🚌 Live Shuttle Loop</h2>
+                <div className="utility-filters" style={{ margin: 0 }}>
+                  <select 
+                    value={shuttleRouteKey} 
+                    onChange={(e) => {
+                      setShuttleRouteKey(e.target.value);
+                      // Set countdown dynamically based on route selection to feel realistic
+                      if (e.target.value === 'inner') setShuttleCountdown(4);
+                      else if (e.target.value === 'outer') setShuttleCountdown(9);
+                      else setShuttleCountdown(2);
+                    }}
+                    className="utility-search-input"
+                    style={{ padding: '6px 12px', borderRadius: '8px', fontSize: '12px' }}
+                  >
+                    <option value="inner">Inner Academic Loop</option>
+                    <option value="outer">Outer Residential Loop</option>
+                    <option value="express">Express Route</option>
+                  </select>
+                </div>
+              </div>
+
               <div className="shuttle-tracker-box">
                 <div className="shuttle-map-route">
                   <div className="route-line"></div>
-                  <div className="route-stop"><span className="route-stop-name">Main Gate</span></div>
-                  <div className="route-stop"><span className="route-stop-name">Library</span></div>
-                  <div className="route-stop"><span className="route-stop-name">Cafeteria</span></div>
-                  <div className="route-stop"><span className="route-stop-name">Hostels</span></div>
+                  {SHUTTLE_ROUTES[shuttleRouteKey].stops.map((stop, index) => {
+                    const pos = SHUTTLE_ROUTES[shuttleRouteKey].positions[index];
+                    return (
+                      <div key={stop} className="route-stop" style={{ left: `${pos}%` }}>
+                        <span className="route-stop-name">{stop}</span>
+                      </div>
+                    );
+                  })}
                   <div className="shuttle-bus-icon">🚌</div>
                 </div>
 
                 <div className="shuttle-info-card">
                   <div className="shuttle-status-row">
                     <span className="shuttle-status-label">Route Loop</span>
-                    <span className="shuttle-status-value">Express Outer Ring</span>
+                    <span className="shuttle-status-value">{SHUTTLE_ROUTES[shuttleRouteKey].name}</span>
                   </div>
                   <div className="shuttle-status-row">
                     <span className="shuttle-status-label">Status</span>
-                    <span className="shuttle-status-value" style={{color: 'var(--accent)'}}>● On Time</span>
+                    <span className="shuttle-status-value" style={{color: 'var(--accent)'}}>● Active & Running</span>
                   </div>
                   <div className="shuttle-status-row">
-                    <span className="shuttle-status-label">Next Stop</span>
-                    <span className="shuttle-status-value">Central Library</span>
+                    <span className="shuttle-status-label">Current Route Stops</span>
+                    <span className="shuttle-status-value" style={{fontSize: '11px'}}>{SHUTTLE_ROUTES[shuttleRouteKey].stops.join(' ➔ ')}</span>
                   </div>
                   <div className="shuttle-status-row" style={{borderBottom: 'none'}}>
                     <span className="shuttle-status-label">Estimated Arrival</span>
@@ -580,6 +684,120 @@ function App() {
           </div>
         )}
       </main>
+
+      {/* Booking Overlay Modal */}
+      {selectedEventForBooking && (
+        <div className="modal-overlay">
+          <div className="booking-modal-card">
+            <button className="modal-close-btn" onClick={handleCloseBooking}>✕</button>
+            
+            {!bookedTicket ? (
+              <>
+                <div className="modal-header">
+                  <h2>Reserve Event Pass</h2>
+                  <p style={{ color: 'var(--text-muted)', fontSize: '13px' }}>
+                    Securing your entrance to: <strong style={{ color: 'var(--text-h)' }}>{selectedEventForBooking.name}</strong>
+                  </p>
+                </div>
+
+                <form onSubmit={handleBookingSubmit} className="booking-form">
+                  <div className="form-group">
+                    <label className="section-label">Full Name</label>
+                    <input 
+                      type="text" 
+                      required 
+                      className="utility-search-input" 
+                      placeholder="e.g. Rahul Kumar"
+                      value={bookingForm.name}
+                      onChange={(e) => setBookingForm({ ...bookingForm, name: e.target.value })}
+                    />
+                  </div>
+                  <div className="form-group">
+                    <label className="section-label">Student / Roll ID</label>
+                    <input 
+                      type="text" 
+                      required 
+                      className="utility-search-input" 
+                      placeholder="e.g. CS-2025-1049"
+                      value={bookingForm.studentId}
+                      onChange={(e) => setBookingForm({ ...bookingForm, studentId: e.target.value })}
+                    />
+                  </div>
+                  <div className="form-group">
+                    <label className="section-label">Academic Department</label>
+                    <select 
+                      className="utility-search-input"
+                      value={bookingForm.dept}
+                      onChange={(e) => setBookingForm({ ...bookingForm, dept: e.target.value })}
+                    >
+                      <option value="Computer Science">Computer Science & Eng.</option>
+                      <option value="Electronics & Comm">Electronics & Comm. Eng.</option>
+                      <option value="Mechanical Eng.">Mechanical Engineering</option>
+                      <option value="Applied Sciences">Applied Sciences</option>
+                      <option value="Business School">Business Administration</option>
+                    </select>
+                  </div>
+                  <button type="submit" className="booking-submit-btn">
+                    🎟️ Confirm Booking & Generate Pass
+                  </button>
+                </form>
+              </>
+            ) : (
+              <div className="ticket-success-view">
+                <div className="success-checkmark">✓</div>
+                <h3>Pass Successfully Reserved!</h3>
+                <p style={{ color: 'var(--text-muted)', fontSize: '13px', marginBottom: '20px' }}>
+                  Please present the ticket reference code below at the venue entrance.
+                </p>
+
+                {/* Glassmorphic Ticket */}
+                <div className="ticket-badge-card">
+                  <div className="ticket-header">
+                    <span className="ticket-brand">CAMPUSCLIMB TICKET</span>
+                    <span className="ticket-id">{bookedTicket.id}</span>
+                  </div>
+                  <div className="ticket-body">
+                    <div className="ticket-title">{bookedTicket.eventName}</div>
+                    <div className="ticket-details-grid">
+                      <div>
+                        <div className="ticket-label">Holder</div>
+                        <div className="ticket-value">{bookedTicket.userName}</div>
+                      </div>
+                      <div>
+                        <div className="ticket-label">Student ID</div>
+                        <div className="ticket-value">{bookedTicket.userStudentId}</div>
+                      </div>
+                      <div>
+                        <div className="ticket-label">Location</div>
+                        <div className="ticket-value">{bookedTicket.eventLocation}</div>
+                      </div>
+                      <div>
+                        <div className="ticket-label">Time</div>
+                        <div className="ticket-value" style={{ fontSize: '10px' }}>{bookedTicket.eventTime}</div>
+                      </div>
+                      <div style={{ gridColumn: '1 / -1', borderTop: '1px dashed var(--border)', paddingTop: '8px', marginTop: '4px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                        <div>
+                          <div className="ticket-label">Seat Assignment</div>
+                          <div className="ticket-value" style={{ color: 'var(--orange)' }}>{bookedTicket.seat}</div>
+                        </div>
+                        <div className="ticket-barcode">|||| | ||||| | |||</div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                <button 
+                  className="filter-chip active" 
+                  style={{ marginTop: '24px', padding: '10px 20px' }} 
+                  onClick={handleCloseBooking}
+                >
+                  Close & Return
+                </button>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
 
       <footer className="app-footer">
         <p>&copy; {new Date().getFullYear()} CampusClimb Guide. Built for university onboarding and navigation.</p>
