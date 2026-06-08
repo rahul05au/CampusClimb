@@ -203,6 +203,11 @@ function App() {
   const [bookingForm, setBookingForm] = useState({ name: '', studentId: '', dept: 'Computer Science' });
   const [bookedTicket, setBookedTicket] = useState(null);
 
+  // SOS States
+  const [sosModalOpen, setSosModalOpen] = useState(false);
+  const [sosAlertActive, setSosAlertActive] = useState(false);
+
+
   // Building Reviews state
   const [buildingReviews, setBuildingReviews] = useState({
     lbr: [
@@ -359,6 +364,23 @@ function App() {
             <span className="stat-label">Weather: Clear Sky</span>
           </div>
         </div>
+      </section>
+
+      {/* Quick Actions Ribbon */}
+      <section className="quick-actions-panel">
+        {[
+          { icon: '☕', label: 'Coffee Shops' },
+          { icon: '🖨️', label: 'Print Stations' },
+          { icon: '🚾', label: 'Nearest Restroom' },
+          { icon: '🔍', label: 'Lost & Found' },
+          { icon: '📚', label: 'Study Rooms' },
+          { icon: '🅿️', label: 'Parking Pass' }
+        ].map((action, idx) => (
+          <button key={idx} className="quick-action-btn" onClick={() => { setActiveTab('utilities'); setUtilitySearch(action.label.split(' ')[0]); }}>
+            <span className="qa-icon">{action.icon}</span>
+            <span className="qa-label">{action.label}</span>
+          </button>
+        ))}
       </section>
 
       {/* Main Workspace Panel */}
@@ -907,11 +929,90 @@ function App() {
         </div>
       )}
 
+      {/* Floating SOS Trigger Button */}
+      <button className="floating-sos-btn" onClick={() => setSosModalOpen(true)}>
+        🚨 SOS Emergency
+      </button>
+
+      {/* SOS Emergency Modal */}
+      {sosModalOpen && (
+        <div className="modal-overlay">
+          <div className="booking-modal-card sos-modal-card">
+            <button className="modal-close-btn" onClick={() => { setSosModalOpen(false); setSosAlertActive(false); }}>✕</button>
+            <div className="modal-header">
+              <h2 style={{ background: 'linear-gradient(135deg, #ef4444, #f97316)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' }}>
+                🚨 Campus SOS Emergency Hub
+              </h2>
+              <p style={{ color: 'var(--text-muted)', fontSize: '13px' }}>
+                Quick contact or emergency alert trigger for immediate campus security dispatch.
+              </p>
+            </div>
+
+            {!sosAlertActive ? (
+              <div className="sos-panel-content">
+                <div className="emergency-contacts-list">
+                  <div className="contact-row">
+                    <span className="contact-icon">📞</span>
+                    <div className="contact-details">
+                      <div className="contact-label">Campus Security Desk</div>
+                      <div className="contact-value">+91 99999-88888</div>
+                    </div>
+                  </div>
+                  <div className="contact-row">
+                    <span className="contact-icon">🚑</span>
+                    <div className="contact-details">
+                      <div className="contact-label">Medical Center Helpline</div>
+                      <div className="contact-value">+91 88888-77777</div>
+                    </div>
+                  </div>
+                  <div className="contact-row">
+                    <span className="contact-icon">👮</span>
+                    <div className="contact-details">
+                      <div className="contact-label">State Police Helpline</div>
+                      <div className="contact-value">112</div>
+                    </div>
+                  </div>
+                </div>
+
+                <button className="trigger-sos-action-btn" onClick={() => setSosAlertActive(true)}>
+                  🔴 TRIGGER EMERGENCY ALERT
+                </button>
+              </div>
+            ) : (
+              <div className="ticket-success-view">
+                <div className="sos-pulse-container">
+                  <div className="sos-pulse-ring"></div>
+                  <div className="sos-pulse-inner">🚨</div>
+                </div>
+                <h3 style={{ color: '#ef4444' }}>SOS Emergency Signal Sent!</h3>
+                <p style={{ color: 'var(--text-h)', fontWeight: '600', fontSize: '14px', marginTop: '10px' }}>
+                  Broadcasting your location...
+                </p>
+                <div className="sos-dispatch-info">
+                  <p>🚨 <strong>Dispatch Alert:</strong> Campus Security Response Vehicle has been dispatched. Estimated arrival: <strong>3 minutes</strong>.</p>
+                  <p style={{ color: 'var(--text-muted)', fontSize: '12px', marginTop: '8px' }}>
+                    Stay calm, remain in a well-lit/populated location if possible. A security officer has been notified.
+                  </p>
+                </div>
+                <button 
+                  className="filter-chip active" 
+                  style={{ marginTop: '20px', background: 'rgba(239, 68, 68, 0.1)', borderColor: 'rgba(239, 68, 68, 0.3)', color: '#ef4444' }} 
+                  onClick={() => setSosAlertActive(false)}
+                >
+                  Cancel / Clear Alert
+                </button>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
       <footer className="app-footer">
         <p>&copy; {new Date().getFullYear()} CampusClimb Guide. Built for university onboarding and navigation.</p>
       </footer>
     </div>
   );
 }
+
 
 export default App;
