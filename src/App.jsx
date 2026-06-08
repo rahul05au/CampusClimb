@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import heroImg from './assets/hero.png';
+import FAQSection from './components/FAQSection';
 import './App.css';
 
 // Custom inline SVG icons for premium styling
@@ -587,100 +588,107 @@ function App() {
         )}
 
         {activeTab === 'transit' && (
-          <div className="shuttle-events-layout">
-            {/* Events column */}
-            <div>
-              <h2 className="panel-section-title">📅 Campus Event Feed</h2>
-              <div className="events-feed">
-                {EVENTS.map((event) => (
-                  <div key={event.id} className="event-item-card">
-                    <div className="event-meta-top">
-                      <span className="event-badge">{event.type}</span>
-                      <span className="event-time">{event.time}</span>
-                    </div>
-                    <h3 className="event-name">{event.name}</h3>
-                    <div className="event-location">
-                      <span>📍</span> {event.location}
-                      <span style={{
-                        marginLeft: 'auto', 
-                        fontSize: '11px', 
-                        color: event.status === 'Live' ? 'var(--accent)' : 'var(--text-muted)', 
-                        fontWeight: '700'
-                      }}>
-                        ● {event.status}
-                      </span>
-                    </div>
-                    
-                    <button 
-                      className="filter-chip active"
-                      style={{ marginTop: '12px', width: 'fit-content', padding: '6px 12px', fontSize: '11px' }}
-                      onClick={() => setSelectedEventForBooking(event)}
-                    >
-                      🎟️ Book Pass / Reserve Seat
-                    </button>
-                  </div>
-                ))}
-              </div>
-            </div>
-
-            {/* Shuttle tracker column */}
-            <div>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
-                <h2 className="panel-section-title" style={{ margin: 0 }}>🚌 Live Shuttle Loop</h2>
-                <div className="utility-filters" style={{ margin: 0 }}>
-                  <select 
-                    value={shuttleRouteKey} 
-                    onChange={(e) => {
-                      setShuttleRouteKey(e.target.value);
-                      // Set countdown dynamically based on route selection to feel realistic
-                      if (e.target.value === 'inner') setShuttleCountdown(4);
-                      else if (e.target.value === 'outer') setShuttleCountdown(9);
-                      else setShuttleCountdown(2);
-                    }}
-                    className="utility-search-input"
-                    style={{ padding: '6px 12px', borderRadius: '8px', fontSize: '12px' }}
-                  >
-                    <option value="inner">Inner Academic Loop</option>
-                    <option value="outer">Outer Residential Loop</option>
-                    <option value="express">Express Route</option>
-                  </select>
-                </div>
-              </div>
-
-              <div className="shuttle-tracker-box">
-                <div className="shuttle-map-route">
-                  <div className="route-line"></div>
-                  {SHUTTLE_ROUTES[shuttleRouteKey].stops.map((stop, index) => {
-                    const pos = SHUTTLE_ROUTES[shuttleRouteKey].positions[index];
-                    return (
-                      <div key={stop} className="route-stop" style={{ left: `${pos}%` }}>
-                        <span className="route-stop-name">{stop}</span>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '40px' }}>
+            <div className="shuttle-events-layout">
+              {/* Events column */}
+              <div>
+                <h2 className="panel-section-title">📅 Campus Event Feed</h2>
+                <div className="events-feed">
+                  {EVENTS.map((event) => (
+                    <div key={event.id} className="event-item-card">
+                      <div className="event-meta-top">
+                        <span className="event-badge">{event.type}</span>
+                        <span className="event-time">{event.time}</span>
                       </div>
-                    );
-                  })}
-                  <div className="shuttle-bus-icon">🚌</div>
+                      <h3 className="event-name">{event.name}</h3>
+                      <div className="event-location">
+                        <span>📍</span> {event.location}
+                        <span style={{
+                          marginLeft: 'auto', 
+                          fontSize: '11px', 
+                          color: event.status === 'Live' ? 'var(--accent)' : 'var(--text-muted)', 
+                          fontWeight: '700'
+                        }}>
+                          ● {event.status}
+                        </span>
+                      </div>
+                      
+                      <button 
+                        className="filter-chip active"
+                        style={{ marginTop: '12px', width: 'fit-content', padding: '6px 12px', fontSize: '11px' }}
+                        onClick={() => setSelectedEventForBooking(event)}
+                      >
+                        🎟️ Book Pass / Reserve Seat
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              {/* Shuttle tracker column */}
+              <div>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
+                  <h2 className="panel-section-title" style={{ margin: 0 }}>🚌 Live Shuttle Loop</h2>
+                  <div className="utility-filters" style={{ margin: 0 }}>
+                    <select 
+                      value={shuttleRouteKey} 
+                      onChange={(e) => {
+                        setShuttleRouteKey(e.target.value);
+                        // Set countdown dynamically based on route selection to feel realistic
+                        if (e.target.value === 'inner') setShuttleCountdown(4);
+                        else if (e.target.value === 'outer') setShuttleCountdown(9);
+                        else setShuttleCountdown(2);
+                      }}
+                      className="utility-search-input"
+                      style={{ padding: '6px 12px', borderRadius: '8px', fontSize: '12px' }}
+                    >
+                      <option value="inner">Inner Academic Loop</option>
+                      <option value="outer">Outer Residential Loop</option>
+                      <option value="express">Express Route</option>
+                    </select>
+                  </div>
                 </div>
 
-                <div className="shuttle-info-card">
-                  <div className="shuttle-status-row">
-                    <span className="shuttle-status-label">Route Loop</span>
-                    <span className="shuttle-status-value">{SHUTTLE_ROUTES[shuttleRouteKey].name}</span>
+                <div className="shuttle-tracker-box">
+                  <div className="shuttle-map-route">
+                    <div className="route-line"></div>
+                    {SHUTTLE_ROUTES[shuttleRouteKey].stops.map((stop, index) => {
+                      const pos = SHUTTLE_ROUTES[shuttleRouteKey].positions[index];
+                      return (
+                        <div key={stop} className="route-stop" style={{ left: `${pos}%` }}>
+                          <span className="route-stop-name">{stop}</span>
+                        </div>
+                      );
+                    })}
+                    <div className="shuttle-bus-icon">🚌</div>
                   </div>
-                  <div className="shuttle-status-row">
-                    <span className="shuttle-status-label">Status</span>
-                    <span className="shuttle-status-value" style={{color: 'var(--accent)'}}>● Active & Running</span>
-                  </div>
-                  <div className="shuttle-status-row">
-                    <span className="shuttle-status-label">Current Route Stops</span>
-                    <span className="shuttle-status-value" style={{fontSize: '11px'}}>{SHUTTLE_ROUTES[shuttleRouteKey].stops.join(' ➔ ')}</span>
-                  </div>
-                  <div className="shuttle-status-row" style={{borderBottom: 'none'}}>
-                    <span className="shuttle-status-label">Estimated Arrival</span>
-                    <span className="shuttle-status-value" style={{color: 'var(--orange)'}}>{shuttleCountdown} mins</span>
+
+                  <div className="shuttle-info-card">
+                    <div className="shuttle-status-row">
+                      <span className="shuttle-status-label">Route Loop</span>
+                      <span className="shuttle-status-value">{SHUTTLE_ROUTES[shuttleRouteKey].name}</span>
+                    </div>
+                    <div className="shuttle-status-row">
+                      <span className="shuttle-status-label">Status</span>
+                      <span className="shuttle-status-value" style={{color: 'var(--accent)'}}>● Active & Running</span>
+                    </div>
+                    <div className="shuttle-status-row">
+                      <span className="shuttle-status-label">Current Route Stops</span>
+                      <span className="shuttle-status-value" style={{fontSize: '11px'}}>{SHUTTLE_ROUTES[shuttleRouteKey].stops.join(' ➔ ')}</span>
+                    </div>
+                    <div className="shuttle-status-row" style={{borderBottom: 'none'}}>
+                      <span className="shuttle-status-label">Estimated Arrival</span>
+                      <span className="shuttle-status-value" style={{color: 'var(--orange)'}}>{shuttleCountdown} mins</span>
+                    </div>
                   </div>
                 </div>
               </div>
             </div>
+            
+            <hr style={{ border: 'none', borderTop: '1px solid var(--border)' }} />
+            
+            {/* FAQ Accordion Component */}
+            <FAQSection />
           </div>
         )}
       </main>
