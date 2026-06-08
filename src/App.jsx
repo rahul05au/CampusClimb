@@ -203,6 +203,48 @@ function App() {
   const [bookingForm, setBookingForm] = useState({ name: '', studentId: '', dept: 'Computer Science' });
   const [bookedTicket, setBookedTicket] = useState(null);
 
+  // Building Reviews state
+  const [buildingReviews, setBuildingReviews] = useState({
+    lbr: [
+      { name: 'Aarav M.', rating: 5, text: 'Rooftop Study Terrace is extremely peaceful. Wi-Fi signal is excellent.' },
+      { name: 'Sneha K.', rating: 4, text: 'Very crowded during exam hours, but the 24/7 lounge is a life saver.' }
+    ],
+    caf: [
+      { name: 'Kabir S.', rating: 5, text: 'The organic juice corner is the best. Highly recommended.' },
+      { name: 'Diya P.', rating: 3, text: 'Lunch hours are very crowded, hard to find a table.' }
+    ],
+    lab: [
+      { name: 'Rohan G.', rating: 5, text: 'Biotech lab equipment is world-class. Great research support.' }
+    ],
+    adm: [
+      { name: 'Vikram A.', rating: 4, text: 'Admissions helpline was helpful, though lines were long.' }
+    ],
+    spt: [
+      { name: 'Neha R.', rating: 5, text: 'The climbing wall is amazing. Safe instructors.' }
+    ],
+    hst: [
+      { name: 'Aman C.', rating: 4, text: 'Spacious study rooms and clean lawn.' }
+    ],
+    inh: [
+      { name: 'Tanya J.', rating: 5, text: 'Perfect place for coding sprint hackathons.' }
+    ]
+  });
+
+  const [newReview, setNewReview] = useState({ name: '', rating: 5, text: '' });
+
+  const handleReviewSubmit = (e) => {
+    e.preventDefault();
+    if (!newReview.name || !newReview.text) return;
+    const bId = selectedBuilding.id;
+    const currentReviews = buildingReviews[bId] || [];
+    setBuildingReviews({
+      ...buildingReviews,
+      [bId]: [...currentReviews, { name: newReview.name, rating: Number(newReview.rating), text: newReview.text }]
+    });
+    setNewReview({ name: '', rating: 5, text: '' });
+  };
+
+
   // Shuttle countdown simulation
   useEffect(() => {
     const interval = setInterval(() => {
@@ -469,6 +511,64 @@ function App() {
                       <div className="busy-progress-fill" style={{width: `${selectedBuilding.busyHours}%`}}></div>
                     </div>
                   </div>
+
+                  <hr style={{ border: 'none', borderTop: '1px dashed var(--border)', margin: '16px 0' }} />
+
+                  {/* Reviews Section */}
+                  <div className="reviews-section">
+                    <div className="section-label">Student Reviews & Ratings</div>
+                    <div className="reviews-list">
+                      {(buildingReviews[selectedBuilding.id] || []).map((rev, idx) => (
+                        <div key={idx} className="review-item-mini">
+                          <div className="review-meta">
+                            <span className="reviewer-name">{rev.name}</span>
+                            <span className="review-stars">{'★'.repeat(rev.rating)}{'☆'.repeat(5 - rev.rating)}</span>
+                          </div>
+                          <p className="review-text">{rev.text}</p>
+                        </div>
+                      ))}
+                      {(buildingReviews[selectedBuilding.id] || []).length === 0 && (
+                        <p style={{ fontSize: '12px', color: 'var(--text-muted)' }}>No reviews yet. Be the first to add one!</p>
+                      )}
+                    </div>
+
+                    {/* Add Review Form */}
+                    <form onSubmit={handleReviewSubmit} className="add-review-form">
+                      <div className="form-row-compact">
+                        <input 
+                          type="text" 
+                          placeholder="Your Name" 
+                          required
+                          value={newReview.name}
+                          onChange={(e) => setNewReview({ ...newReview, name: e.target.value })}
+                          className="review-input"
+                        />
+                        <select 
+                          value={newReview.rating}
+                          onChange={(e) => setNewReview({ ...newReview, rating: Number(e.target.value) })}
+                          className="review-input rating-select"
+                        >
+                          <option value="5">⭐⭐⭐⭐⭐</option>
+                          <option value="4">⭐⭐⭐⭐</option>
+                          <option value="3">⭐⭐⭐</option>
+                          <option value="2">⭐⭐</option>
+                          <option value="1">⭐</option>
+                        </select>
+                      </div>
+                      <textarea 
+                        placeholder="Write a quick tip or feedback..." 
+                        required
+                        rows="2"
+                        value={newReview.text}
+                        onChange={(e) => setNewReview({ ...newReview, text: e.target.value })}
+                        className="review-input text-area"
+                      />
+                      <button type="submit" className="filter-chip active review-submit-btn">
+                        Submit Review
+                      </button>
+                    </form>
+                  </div>
+
                 </>
               ) : (
                 <div className="sidebar-placeholder">
