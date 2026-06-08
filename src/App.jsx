@@ -1004,6 +1004,9 @@ function App() {
 
       <footer className="app-footer">
         <p>&copy; {new Date().getFullYear()} CampusClimb Guide. Built for university onboarding and navigation.</p>
+        <p style={{ marginTop: '8px', fontSize: '11px', fontStyle: 'italic', color: 'var(--text-muted)', opacity: 0.7 }}>
+          Campus Wisdom: "If you can't find the library, follow the students with the biggest coffee cups." ☕
+        </p>
       </footer>
     </div>
   );
