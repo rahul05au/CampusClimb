@@ -725,13 +725,8 @@ function App() {
                       <h3 className="event-name">{event.name}</h3>
                       <div className="event-location">
                         <span>📍</span> {event.location}
-                        <span style={{
-                          marginLeft: 'auto', 
-                          fontSize: '11px', 
-                          color: event.status === 'Live' ? 'var(--accent)' : 'var(--text-muted)', 
-                          fontWeight: '700'
-                        }}>
-                          ● {event.status}
+                        <span className={`event-status-indicator ${event.status === 'Live' ? 'live' : ''}`}>
+                          <span className="status-dot"></span> {event.status}
                         </span>
                       </div>
                       
