@@ -294,6 +294,11 @@ function App() {
 
   return (
     <div className="app-container">
+      {/* Urgent Announcement Banner */}
+      <div style={{ background: '#f59e0b', color: '#fff', textAlign: 'center', padding: '8px', fontSize: '12px', fontWeight: 'bold' }}>
+        📢 Campus Announcement: The library coffee machine is officially out of order. Stay strong, everyone! ☕
+      </div>
+
       {/* App Header */}
       <header className="app-header">
         <div className="logo-section">
