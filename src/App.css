@@ -41,6 +41,7 @@
   width: 32px;
   height: 32px;
   fill: var(--accent);
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
 .subtitle {
@@ -149,6 +150,12 @@
   font-weight: 700;
   color: var(--text-h);
   font-family: var(--font-heading);
+}
+
+.logo-section:hover .logo-icon {
+  fill: var(--purple);
+  filter: drop-shadow(0 0 12px var(--purple));
+  transform: rotate(-10deg) scale(1.1);
 }
 
 .stat-label {
