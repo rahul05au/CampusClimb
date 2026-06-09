@@ -643,6 +643,13 @@ function App() {
               >
                 ▶
               </button>
+              <button
+                className="filter-chip"
+                style={{ marginLeft: 'auto', background: 'rgba(239, 68, 68, 0.1)', color: '#ef4444', borderColor: 'rgba(239, 68, 68, 0.3)' }}
+                onClick={() => setActiveTab('map')}
+              >
+                End Tour
+              </button>
             </div>
           </div>
         )}
