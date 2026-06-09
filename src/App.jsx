@@ -357,11 +357,11 @@ function App() {
             <span className="stat-label">Next Shuttle ({shuttleRouteKey})</span>
           </div>
         </div>
-        <div className="stat-card">
+        <div className="stat-card" title="Perfect weather to skip class... but don't do it!">
           <div className="stat-icon-wrapper accent">🌡️</div>
           <div className="stat-info">
             <span className="stat-value">24° C</span>
-            <span className="stat-label">Weather: Clear Sky</span>
+            <span className="stat-label">Weather: Perfect for Chai</span>
           </div>
         </div>
       </section>
