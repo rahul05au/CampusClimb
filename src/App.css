@@ -438,6 +438,11 @@
   width: 100%;
   height: 100%;
   object-fit: cover;
+  transition: transform 0.6s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+}
+
+.tour-hero-frame:hover .tour-image {
+  transform: scale(1.08);
 }
 
 .tour-gradient-overlay {
