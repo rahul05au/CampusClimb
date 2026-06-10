@@ -294,6 +294,7 @@ function App() {
 
   return (
     <div className="app-container">
+      <a href="#main-content" className="skip-link">Skip to main content</a>
       {/* Urgent Announcement Banner */}
       <div style={{ background: '#f59e0b', color: '#fff', textAlign: 'center', padding: '8px', fontSize: '12px', fontWeight: 'bold' }}>
         📢 Campus Announcement: The library coffee machine is officially out of order. Stay strong, everyone! ☕
@@ -389,7 +390,7 @@ function App() {
       </section>
 
       {/* Main Workspace Panel */}
-      <main className="main-panel">
+      <main id="main-content" className="main-panel">
         {activeTab === 'map' && (
           <div className="map-guide-layout">
             {/* Left side: Interactive Map */}
