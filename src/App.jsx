@@ -883,7 +883,7 @@ function App() {
             ) : (
               <div className="ticket-success-view">
                 <div className="success-checkmark">✓</div>
-                <h3>Pass Successfully Reserved!</h3>
+                <h3>🎉 Pass Successfully Reserved! 🎉</h3>
                 <p style={{ color: 'var(--text-muted)', fontSize: '13px', marginBottom: '20px' }}>
                   Please present the ticket reference code below at the venue entrance.
                 </p>
