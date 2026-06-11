@@ -4,7 +4,7 @@
 [![Build Status](https://img.shields.io/badge/Build-Passing-22c55e?style=for-the-badge)](https://github.com/rahul05au/CampusClimb)
 [![License](https://img.shields.io/badge/License-MIT-f97316?style=for-the-badge)](https://github.com/rahul05au/CampusClimb/blob/main/LICENSE)
 
-A premium, interactive college/university campus navigation and exploration guide built with **React** and **Vite**.
+An elegant and interactive college/university campus navigation and exploration guide built with **React** and **Vite**.
 
 ## 🚀 Features
 
