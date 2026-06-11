@@ -48,3 +48,7 @@ Ensure you have **Node.js** installed on your system.
 ## 📄 License
 
 This project is licensed under the MIT License.
+
+## 🤝 Contributing
+
+Contributions, issues, and feature requests are welcome! Feel free to check the [issues page](https://github.com/rahul05au/CampusClimb/issues).
