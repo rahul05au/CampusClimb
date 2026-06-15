@@ -6,3 +6,5 @@
 - CampusClimb Update 3: General improvements and minor fixes.
 
 - CampusClimb Feature A Update 4.
+
+- CampusClimb Feature A Update 5.
