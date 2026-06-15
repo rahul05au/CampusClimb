@@ -8,3 +8,5 @@
 - CampusClimb Feature B Update 7.
 
 - CampusClimb Feature B Update 8.
+
+- CampusClimb Feature B Update 9.
