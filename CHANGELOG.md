@@ -8,3 +8,5 @@
 - CampusClimb Feature A Update 4.
 
 - CampusClimb Feature A Update 5.
+
+- CampusClimb Feature A Update 6.
