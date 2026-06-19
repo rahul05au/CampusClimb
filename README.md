@@ -1,5 +1,7 @@
 # CampusClimb 🏫🗺️
 
+<!-- commit 3 -->
+
 [![Version](https://img.shields.io/badge/CampusClimb-v1.0.0-14b8a6?style=for-the-badge&logo=react)](https://github.com/rahul05au/CampusClimb)
 [![Build Status](https://img.shields.io/badge/Build-Passing-22c55e?style=for-the-badge)](https://github.com/rahul05au/CampusClimb)
 [![License](https://img.shields.io/badge/License-MIT-f97316?style=for-the-badge)](https://github.com/rahul05au/CampusClimb/blob/main/LICENSE)
