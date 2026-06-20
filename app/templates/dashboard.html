@@ -1,0 +1,57 @@
+{% extends "base.html" %}
+{% block title %}Dashboard — CampusClimb{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <h2 class="fw-bold mb-0">📊 Topic Dashboard — Operating Systems</h2>
+    <span class="text-muted small">Sorted by importance (high → low)</span>
+</div>
+
+{% if topics %}
+<div class="table-responsive">
+    <table class="table table-dark table-hover cc-table">
+        <thead>
+            <tr>
+                <th>#</th>
+                <th>Unit</th>
+                <th>Topic</th>
+                <th>Importance</th>
+                <th>Score</th>
+                <th>PYQ Count</th>
+                <th>Note Chunks</th>
+                <th></th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for topic in topics %}
+            <tr>
+                <td>{{ loop.index }}</td>
+                <td><span class="text-muted">Unit {{ topic.unit_number }}</span></td>
+                <td class="fw-semibold">{{ topic.topic_name }}</td>
+                <td>
+                    {% if topic.importance_label == "High" %}
+                        <span class="badge bg-danger">High</span>
+                    {% elif topic.importance_label == "Medium" %}
+                        <span class="badge bg-warning text-dark">Medium</span>
+                    {% elif topic.importance_label == "Low" %}
+                        <span class="badge bg-success">Low</span>
+                    {% else %}
+                        <span class="badge bg-secondary">N/A</span>
+                    {% endif %}
+                </td>
+                <td>{{ "%.2f"|format(topic.importance_score) }}</td>
+                <td>{{ topic.question_count }}</td>
+                <td>{{ topic.chunk_count }}</td>
+                <td><a href="/topic/{{ topic.id }}" class="btn btn-sm btn-outline-light">View →</a></td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+{% else %}
+<div class="cc-card p-5 text-center">
+    <h4 class="text-muted">No syllabus uploaded yet</h4>
+    <p class="text-muted">Upload a syllabus from the <a href="/">Home page</a> to get started.</p>
+</div>
+{% endif %}
+{% endblock %}

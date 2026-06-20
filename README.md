@@ -1,56 +1,179 @@
-# CampusClimb 🏫🗺️
+# CampusClimb — NLP-Based Syllabus-Aligned Notes System
 
-<!-- commit 3 -->
+[![Python](https://img.shields.io/badge/Python-3.11+-3776ab?style=for-the-badge&logo=python&logoColor=white)](https://python.org)
+[![FastAPI](https://img.shields.io/badge/FastAPI-0.115-009688?style=for-the-badge&logo=fastapi&logoColor=white)](https://fastapi.tiangolo.com)
+[![MySQL](https://img.shields.io/badge/MySQL-8.0+-4479a1?style=for-the-badge&logo=mysql&logoColor=white)](https://mysql.com)
 
-[![Version](https://img.shields.io/badge/CampusClimb-v1.0.0-14b8a6?style=for-the-badge&logo=react)](https://github.com/rahul05au/CampusClimb)
-[![Build Status](https://img.shields.io/badge/Build-Passing-22c55e?style=for-the-badge)](https://github.com/rahul05au/CampusClimb)
-[![License](https://img.shields.io/badge/License-MIT-f97316?style=for-the-badge)](https://github.com/rahul05au/CampusClimb/blob/main/LICENSE)
+**NLP-Based System for Syllabus-Aligned Organization and Semantic Deduplication of Crowdsourced Student Notes with PYQ-Based Topic Importance Estimation**
 
-An elegant and interactive college/university campus navigation and exploration guide built with **React** and **Vite**.
+Pilot subject: **Operating Systems**
 
-## 🚀 Features
+---
 
-- 🗺️ **Interactive Campus Blueprint**: A fully clickable 2D SVG map showing building layouts, locations, and live details.
-- 🏢 **Dynamic Building Status & Stats**: View real-time crowdedness, opening hours, popular spots, and features for each building.
-- 🚶 **Guided Virtual Tour**: Stepper-based showcase for freshmen and visitors to tour the campus landmarks.
-- 🚰 **Utility & Amenity Finder**: Filter and search for restrooms, water dispensers, Wi-Fi zones, and security points.
-- 🚌 **Transit Loop & Event Feed**: Track the live campus shuttle and view upcoming sports, cultural, and technical events.
+## Overview
 
-## 🛠️ Tech Stack
+CampusClimb is a research prototype that:
 
-- **Core**: React.js, Vite
-- **Styling**: Pure CSS (Glassmorphic theme with modern dark/light system)
-- **Icons**: Custom inline SVGs & Emojis
+1. **Parses a syllabus** into structured topics (units → topics)
+2. **Ingests student notes** (PDF), chunks them, and semantically maps each chunk to the most relevant syllabus topic using sentence embeddings
+3. **Deduplicates** overlapping note chunks within each topic using cosine similarity and Union-Find clustering
+4. **Analyzes Previous Year Questions (PYQs)** to estimate topic importance based on question frequency
+5. **Presents a dashboard** showing syllabus topics ranked by importance with deduplicated, organized notes
 
-## 📦 Getting Started
+## Tech Stack
 
-### Prerequisites
+| Component | Technology |
+|-----------|-----------|
+| Language | Python 3.11+ |
+| Backend | FastAPI |
+| Database | MySQL (SQLAlchemy ORM) |
+| NLP | sentence-transformers (`all-MiniLM-L6-v2`), scikit-learn |
+| PDF Parsing | pdfplumber |
+| Frontend | Jinja2 templates + Bootstrap 5 |
+| Embeddings | JSON-serialized vectors in MySQL |
 
-Ensure you have **Node.js** installed on your system.
+## Setup Instructions
 
-### Installation
+### 1. Prerequisites
 
-1. Clone the repository:
-   ```bash
-   git clone https://github.com/rahul05au/CampusClimb.git
+- Python 3.11 or higher
+- MySQL 8.0 or higher (running locally)
+- pip (Python package manager)
+
+### 2. Create MySQL Database
+
+```sql
+CREATE DATABASE campusclimb_nlp CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+```
+
+### 3. Clone and Install
+
+```bash
+git clone https://github.com/rahul05au/CampusClimb.git
+cd CampusClimb
+python -m venv venv
+venv\Scripts\activate        # Windows
+# source venv/bin/activate   # Linux/Mac
+pip install -r requirements.txt
+```
+
+### 4. Configure Environment
+
+```bash
+copy .env.example .env
+```
+
+Edit `.env` with your MySQL credentials:
+
+```
+DATABASE_URL=mysql+pymysql://root:yourpassword@localhost:3306/campusclimb_nlp
+```
+
+### 5. Run the Application
+
+```bash
+uvicorn app.main:app --reload
+```
+
+Open http://localhost:8000 in your browser.
+
+### 6. NLTK Data (First Run)
+
+The sentence tokenizer requires NLTK's `punkt_tab` data. It will be downloaded automatically on first use, or you can pre-download:
+
+```python
+import nltk
+nltk.download('punkt_tab')
+```
+
+## Usage Workflow
+
+1. **Upload Syllabus** — Upload a `.txt` or `.pdf` file with the syllabus structured as:
    ```
-2. Navigate to the project directory:
-   ```bash
-   cd CampusClimb
-   ```
-3. Install dependencies:
-   ```bash
-   npm install
-   ```
-4. Start the local development server:
-   ```bash
-   npm run dev
+   UNIT 1: Introduction to Operating Systems
+   - Process Management
+   - CPU Scheduling
+   UNIT 2: Memory Management
+   - Paging
+   - Segmentation
    ```
 
-## 📄 License
+2. **Upload Notes** — Upload student note PDFs (one at a time) with the student's name. The system will automatically chunk, embed, map to topics, and deduplicate.
 
-This project is licensed under the MIT License.
+3. **Upload PYQs** — Upload Previous Year Question PDFs with the year. Questions are extracted, embedded, and mapped to topics to compute importance scores.
 
-## 🤝 Contributing
+4. **View Dashboard** — See all topics ranked by PYQ-based importance with deduplicated note chunks.
 
-Contributions, issues, and feature requests are welcome! Feel free to check the [issues page](https://github.com/rahul05au/CampusClimb/issues).
+## Project Structure
+
+```
+CampusClimb/
+├── config.py                 # Tunable parameters (thresholds, chunk size)
+├── requirements.txt          # Pinned dependencies
+├── .env.example              # Environment variable template
+├── app/
+│   ├── main.py               # FastAPI application entry point
+│   ├── database.py           # SQLAlchemy engine and session
+│   ├── models.py             # ORM models (5 tables)
+│   ├── routers/
+│   │   ├── upload.py         # Upload endpoints (syllabus, notes, PYQs)
+│   │   └── dashboard.py      # Dashboard and topic detail views
+│   ├── templates/            # Jinja2 HTML templates
+│   └── static/               # CSS
+├── core/
+│   ├── embeddings.py         # Sentence-transformers singleton + similarity
+│   ├── syllabus_parser.py    # Syllabus text/PDF parser
+│   ├── pdf_extractor.py      # PDF text extraction + chunking
+│   ├── topic_mapper.py       # Semantic topic mapping
+│   ├── deduplicator.py       # Union-Find deduplication
+│   └── pyq_analyzer.py       # PYQ extraction + importance scoring
+└── evaluation/
+    ├── label_dedup_pairs.py   # Generate CSV for manual dedup labeling
+    ├── evaluate_dedup.py      # Compute dedup precision/recall/F1
+    └── evaluate_mapping.py    # Compute topic mapping accuracy
+```
+
+## Evaluation Scripts
+
+These scripts generate the metrics needed for the research paper's Results section.
+
+### Deduplication Evaluation
+
+```bash
+# Step 1: Generate labeled pairs CSV
+python -m evaluation.label_dedup_pairs
+
+# Step 2: Manually fill the 'manual_label' column in evaluation/output/dedup_pairs.csv (1=duplicate, 0=not)
+
+# Step 3: Compute precision, recall, F1
+python -m evaluation.evaluate_dedup
+```
+
+### Topic Mapping Evaluation
+
+```bash
+# Step 1: Generate mapping CSV
+python -m evaluation.evaluate_mapping
+
+# Step 2: Manually fill 'manual_correct_topic_id' in evaluation/output/mapping_pairs.csv
+
+# Step 3: Compute accuracy
+python -m evaluation.evaluate_mapping --evaluate
+```
+
+## Configuration
+
+Edit `config.py` to tune parameters for experimentation:
+
+| Parameter | Default | Description |
+|-----------|---------|-------------|
+| `MODEL_NAME` | `all-MiniLM-L6-v2` | Sentence-transformers model |
+| `SENTENCES_PER_CHUNK` | `4` | Sentences per text chunk |
+| `MIN_CHUNK_WORDS` | `20` | Minimum words to keep a chunk |
+| `DEDUP_SIMILARITY_THRESHOLD` | `0.85` | Cosine similarity threshold for dedup |
+| `IMPORTANCE_LOW_THRESHOLD` | `0.05` | Below this = "Low" importance |
+| `IMPORTANCE_HIGH_THRESHOLD` | `0.15` | Above this = "High" importance |
+
+## License
+
+MIT License

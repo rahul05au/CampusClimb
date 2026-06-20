@@ -1,0 +1,123 @@
+/* CampusClimb — Custom Styles (on top of Bootstrap 5 dark theme) */
+
+:root {
+    --cc-bg: #1a1a2e;
+    --cc-surface: rgba(255, 255, 255, 0.05);
+    --cc-border: rgba(255, 255, 255, 0.1);
+    --cc-glass-blur: 12px;
+}
+
+body {
+    font-family: 'Inter', system-ui, sans-serif;
+    background-color: var(--cc-bg);
+    color: #e0e0e0;
+    min-height: 100vh;
+}
+
+/* Navbar */
+.cc-navbar {
+    background: rgba(16, 16, 36, 0.9);
+    backdrop-filter: blur(var(--cc-glass-blur));
+    border-bottom: 1px solid var(--cc-border);
+}
+
+/* Glassmorphic Cards */
+.cc-card {
+    background: var(--cc-surface);
+    backdrop-filter: blur(var(--cc-glass-blur));
+    border: 1px solid var(--cc-border);
+    border-radius: 12px;
+    transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.cc-card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+}
+
+/* Table */
+.cc-table {
+    --bs-table-bg: transparent;
+    --bs-table-hover-bg: rgba(255, 255, 255, 0.05);
+    border-color: var(--cc-border);
+}
+
+.cc-table th {
+    border-color: var(--cc-border);
+    font-weight: 600;
+    text-transform: uppercase;
+    font-size: 0.75rem;
+    letter-spacing: 0.05em;
+    color: #aaa;
+}
+
+.cc-table td {
+    border-color: var(--cc-border);
+    vertical-align: middle;
+}
+
+/* Footer */
+.cc-footer {
+    border-top: 1px solid var(--cc-border);
+}
+
+/* Form Controls */
+.form-control {
+    background: rgba(255, 255, 255, 0.08);
+    border-color: var(--cc-border);
+    color: #e0e0e0;
+}
+
+.form-control:focus {
+    background: rgba(255, 255, 255, 0.1);
+    border-color: #0dcaf0;
+    box-shadow: 0 0 0 0.2rem rgba(13, 202, 240, 0.15);
+    color: #e0e0e0;
+}
+
+/* Accordion */
+.cc-accordion-btn {
+    background: rgba(255, 255, 255, 0.03);
+    color: #aaa;
+    font-size: 0.875rem;
+}
+
+.cc-accordion-btn:not(.collapsed) {
+    background: rgba(255, 255, 255, 0.06);
+    color: #e0e0e0;
+}
+
+.accordion-item {
+    background: transparent;
+}
+
+.accordion-body {
+    background: rgba(0, 0, 0, 0.2);
+}
+
+/* Inner Chunk (duplicate in cluster) */
+.cc-inner-chunk {
+    background: rgba(255, 255, 255, 0.03);
+    border: 1px solid var(--cc-border);
+    border-radius: 8px;
+}
+
+/* Badge adjustments */
+.badge {
+    font-weight: 500;
+}
+
+/* Breadcrumb */
+.breadcrumb {
+    --bs-breadcrumb-divider-color: #666;
+    --bs-breadcrumb-item-active-color: #e0e0e0;
+}
+
+.breadcrumb a {
+    color: #0dcaf0;
+    text-decoration: none;
+}
+
+.breadcrumb a:hover {
+    color: #3dd8f5;
+}

@@ -1,0 +1,89 @@
+{% extends "base.html" %}
+{% block title %}CampusClimb — Upload{% endblock %}
+
+{% block content %}
+<div class="text-center mb-5">
+    <h1 class="display-5 fw-bold">📚 CampusClimb</h1>
+    <p class="lead text-muted">NLP-Based Syllabus-Aligned Organization &amp; Semantic Deduplication of Student Notes</p>
+    <p class="text-muted">Pilot Subject: <strong>Operating Systems</strong></p>
+</div>
+
+<!-- Stats Row -->
+<div class="row g-3 mb-5">
+    <div class="col-md-4">
+        <div class="cc-card text-center p-3">
+            <div class="fs-2 fw-bold text-info">{{ syllabus_count }}</div>
+            <div class="text-muted small">Syllabus Topics</div>
+        </div>
+    </div>
+    <div class="col-md-4">
+        <div class="cc-card text-center p-3">
+            <div class="fs-2 fw-bold text-success">{{ notes_count }}</div>
+            <div class="text-muted small">Notes Uploaded</div>
+        </div>
+    </div>
+    <div class="col-md-4">
+        <div class="cc-card text-center p-3">
+            <div class="fs-2 fw-bold text-warning">{{ pyq_count }}</div>
+            <div class="text-muted small">PYQ Questions</div>
+        </div>
+    </div>
+</div>
+
+<!-- Upload Forms -->
+<div class="row g-4">
+    <!-- Syllabus Upload -->
+    <div class="col-md-4">
+        <div class="cc-card p-4 h-100">
+            <h5 class="fw-semibold mb-3">📋 Upload Syllabus</h5>
+            <p class="text-muted small">Upload a .txt or .pdf syllabus file. Must be uploaded first before notes or PYQs.</p>
+            <form action="/upload/syllabus" method="post" enctype="multipart/form-data">
+                <div class="mb-3">
+                    <input type="file" class="form-control" name="file" accept=".txt,.pdf" required>
+                </div>
+                <button type="submit" class="btn btn-info w-100">Upload Syllabus</button>
+            </form>
+        </div>
+    </div>
+
+    <!-- Notes Upload -->
+    <div class="col-md-4">
+        <div class="cc-card p-4 h-100">
+            <h5 class="fw-semibold mb-3">📝 Upload Notes</h5>
+            <p class="text-muted small">Upload a student's note PDF. Chunks are auto-mapped to syllabus topics and deduplicated.</p>
+            <form action="/upload/notes" method="post" enctype="multipart/form-data">
+                <div class="mb-3">
+                    <input type="text" class="form-control" name="student_name" placeholder="Student Name" required>
+                </div>
+                <div class="mb-3">
+                    <input type="file" class="form-control" name="file" accept=".pdf" required>
+                </div>
+                <button type="submit" class="btn btn-success w-100">Upload Notes</button>
+            </form>
+        </div>
+    </div>
+
+    <!-- PYQ Upload -->
+    <div class="col-md-4">
+        <div class="cc-card p-4 h-100">
+            <h5 class="fw-semibold mb-3">📄 Upload PYQs</h5>
+            <p class="text-muted small">Upload a Previous Year Question paper PDF. Questions are mapped to topics for importance scoring.</p>
+            <form action="/upload/pyqs" method="post" enctype="multipart/form-data">
+                <div class="mb-3">
+                    <input type="number" class="form-control" name="year" placeholder="Year (e.g. 2023)" min="2000" max="2099" required>
+                </div>
+                <div class="mb-3">
+                    <input type="file" class="form-control" name="file" accept=".pdf" required>
+                </div>
+                <button type="submit" class="btn btn-warning w-100">Upload PYQs</button>
+            </form>
+        </div>
+    </div>
+</div>
+
+{% if syllabus_count > 0 %}
+<div class="text-center mt-5">
+    <a href="/dashboard" class="btn btn-outline-light btn-lg">View Topic Dashboard →</a>
+</div>
+{% endif %}
+{% endblock %}
