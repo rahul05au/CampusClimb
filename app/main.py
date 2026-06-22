@@ -1,4 +1,4 @@
-"""
+""" work
 FastAPI Application Entry Point.
 
 Mounts Jinja2 templates, static files, and includes all route modules.
