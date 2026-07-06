@@ -1,5 +1,5 @@
 """
-Dashboard Router — View endpoints for the home page, topic dashboard, and
+Dashboard Router — View endpoints for the home page, topic dashboard, and 
 topic detail pages.
 """
 
