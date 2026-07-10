@@ -10,7 +10,7 @@ MODEL_NAME = "all-MiniLM-L6-v2"
 
 # Text chunking 
 SENTENCES_PER_CHUNK = 4
-MIN_CHUNK_WORDS = 20
+MIN_CHUNK_WORDS = 20 
 
 # Semantic deduplication 
 DEDUP_SIMILARITY_THRESHOLD = 0.85
