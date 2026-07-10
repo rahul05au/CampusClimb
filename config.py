@@ -8,7 +8,7 @@ Adjust these values for experimentation (paper's Results section).
 # Sentence-Transformers model
 MODEL_NAME = "all-MiniLM-L6-v2"
 
-# Text chunking
+# Text chunking 
 SENTENCES_PER_CHUNK = 4
 MIN_CHUNK_WORDS = 20
 
