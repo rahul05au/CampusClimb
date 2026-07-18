@@ -21,7 +21,6 @@ from app.database import SessionLocal
 from app.models import NoteChunk, SyllabusTopic
 from core.topic_mapper import map_chunk_to_topic
 
-
 def generate_csv():
     """Sample chunks and output CSV for manual topic-mapping labeling."""
     db = SessionLocal()
