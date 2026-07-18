@@ -5,7 +5,6 @@ topic mapping by comparing system predictions against manual labels.
 Modes:
     Generate CSV:  python -m evaluation.evaluate_mapping
     Evaluate:      python -m evaluation.evaluate_mapping --evaluate
-
 Outputs:
     evaluation/output/mapping_pairs.csv    (generate mode)
     evaluation/output/mapping_results.txt  (evaluate mode)
