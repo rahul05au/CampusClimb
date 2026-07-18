@@ -40,7 +40,7 @@ def generate_csv():
         topics = db.query(SyllabusTopic).all()
         topic_embeddings = [
             (t.id, json.loads(t.embedding)) for t in topics
-            if t.embedding
+            if t.embedding 
         ]
         topic_names = {t.id: t.topic_name for t in topics}
 
