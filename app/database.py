@@ -2,7 +2,7 @@
 Database configuration — SQLAlchemy engine, session factory, and Base.
 Loads the MySQL connection string from the DATABASE_URL environment variable
 defined in the .env file.
-"""
+""" 
 
 import os
 
