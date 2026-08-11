@@ -3,7 +3,7 @@ FastAPI Application Entry Point.
 
 Mounts Jinja2 templates, static files, and includes all route modules.
 Creates database tables on startup.
-"""
+""" 
  
 import os
 from contextlib import asynccontextmanager
