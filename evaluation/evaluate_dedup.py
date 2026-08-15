@@ -4,7 +4,7 @@ for the semantic deduplication system against manual labels.
 
 Also performs a threshold sweep to find the optimal similarity threshold.
 
-Usage:
+Usage: 
     python -m evaluation.evaluate_dedup
 
 Requires:
