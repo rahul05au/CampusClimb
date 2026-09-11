@@ -6,7 +6,7 @@ import {
   AlertTriangle, Clock, Trash2, Languages, BookOpen, ChevronRight,
   UploadCloud, CheckCircle2, X, Copy, Check, FileText,
   Mic, Layers, HelpCircle,
-  Cpu, BookCheck, Volume2, VolumeX, Plus
+  Cpu, BookCheck, Volume2, VolumeX, Plus, Square, Pause, Play
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import axios from 'axios';
@@ -39,8 +39,8 @@ mermaid.initialize({
 });
 
 /**
- * Clean text for SpeechSynthesis:
- * Strips citation tags [1], markdown formatting, and raw code blocks to ensure natural speech.
+ * Clean text for SpeechSynthesis & Neural edge-tts:
+ * Strips citation tags [1], markdown formatting, raw code blocks, and URLs to ensure natural speech.
  */
 function cleanTextForTTS(text) {
   if (!text) return '';
@@ -55,10 +55,93 @@ function cleanTextForTTS(text) {
   cleaned = cleaned.replace(/\*([^*]+)\*/g, '$1');
   cleaned = cleaned.replace(/__([^_]+)__/g, '$1');
   cleaned = cleaned.replace(/_([^_]+)_/g, '$1');
-  cleaned = cleaned.replace(/^[\s*-•]+\s+/gm, '');
+  cleaned = cleaned.replace(/^[\s*•\-]+\s+/gm, '');
+  // Remove URLs
+  cleaned = cleaned.replace(/https?:\/\/\S+/g, '');
   // Clean multiple whitespace and newlines
   cleaned = cleaned.replace(/\s+/g, ' ').trim();
   return cleaned;
+}
+
+/**
+ * Splits text into natural sentence chunks on '.', '?', '!', and Hindi purna viram '।'
+ * Groups very short fragments so speech flows smoothly without choppy gaps.
+ */
+function splitIntoSentences(text) {
+  if (!text) return [];
+  const cleaned = cleanTextForTTS(text);
+  if (!cleaned) return [];
+
+  // Match sentences ending in punctuation including Devanagari purna viram \u0964 (।)
+  const rawChunks = cleaned
+    .replace(/([.!?\u0964]+)(\s+|$)/g, '$1\n')
+    .split('\n')
+    .map((s) => s.trim())
+    .filter(Boolean);
+
+  if (rawChunks.length === 0) return [cleaned];
+
+  // Merge overly short fragments (< 30 characters) so speech flows smoothly without choppy gaps
+  const chunks = [];
+  let buffer = '';
+
+  for (const chunk of rawChunks) {
+    if (buffer) {
+      buffer += ' ' + chunk;
+      if (buffer.length >= 40) {
+        chunks.push(buffer);
+        buffer = '';
+      }
+    } else if (chunk.length < 30) {
+      buffer = chunk;
+    } else {
+      chunks.push(chunk);
+    }
+  }
+
+  if (buffer) {
+    if (chunks.length > 0) {
+      chunks[chunks.length - 1] += ' ' + buffer;
+    } else {
+      chunks.push(buffer);
+    }
+  }
+
+  return chunks.length > 0 ? chunks : [cleaned];
+}
+
+/**
+ * Live audio waveform animation indicating active neural speech playback.
+ * Synced directly to HTML5 Audio element playback state.
+ */
+function AudioWaveform({ isPlaying }) {
+  const bars = [0.4, 0.9, 0.5, 1.0, 0.6, 0.85, 0.35];
+  return (
+    <div className="flex items-center gap-0.5 h-4 px-1" title={isPlaying ? "Audio playing" : "Audio paused"}>
+      {bars.map((h, i) => (
+        <motion.span
+          key={i}
+          className="w-0.5 rounded-full bg-teal-400"
+          animate={
+            isPlaying
+              ? {
+                  scaleY: [h * 0.35, h * 1.3, h * 0.25],
+                  opacity: [0.6, 1, 0.6],
+                }
+              : { scaleY: 0.2, opacity: 0.3 }
+          }
+          transition={{
+            duration: 0.55 + (i % 3) * 0.12,
+            repeat: isPlaying ? Infinity : 0,
+            repeatType: 'reverse',
+            ease: 'easeInOut',
+            delay: i * 0.07,
+          }}
+          style={{ height: '100%', transformOrigin: 'bottom' }}
+        />
+      ))}
+    </div>
+  );
 }
 
 function MermaidRenderer({ chart }) {
@@ -217,41 +300,26 @@ export default function Query() {
 
   // Voice State Machine: 'IDLE' | 'LISTENING' | 'THINKING' | 'SPEAKING'
   const [voiceStatus, setVoiceStatus] = useState('IDLE');
-  const [isSpeechPaused, setIsSpeechPaused] = useState(false);
+  const [isAudioPlaying, setIsAudioPlaying] = useState(false);
+  const [currentSentenceIndex, setCurrentSentenceIndex] = useState(0);
+  const [totalSentencesCount, setTotalSentencesCount] = useState(0);
   const [speechSupported, setSpeechSupported] = useState(true);
-  const [voices, setVoices] = useState([]);
   const [autoSpeak, setAutoSpeak] = useState(() => {
     return localStorage.getItem('campusclimb_autospeak') === 'true';
   });
 
-  // Active Voice Mode flag and utterance refs to prevent Chrome garbage collection
+  // Neural edge-tts audio element & queue refs
+  const audioRef = useRef(null);
+  const audioQueueRef = useRef([]);
+  const currentAudioUrlRef = useRef(null);
+  const activeAbortControllerRef = useRef(null);
+  const currentLangRef = useRef('en');
+  const isVoiceModeSpeakingRef = useRef(false);
+  const playNextChunkRef = useRef(null);
+
+  // Active Voice Mode flag and speech recognition ref
   const isVoiceModeRef = useRef(false);
-  const activeUtteranceRef = useRef(null);
   const recognitionRef = useRef(null);
-
-  // Load and cache browser voices safely on mount
-  useEffect(() => {
-    if (typeof window === 'undefined' || !window.speechSynthesis) {
-      setSpeechSupported(false);
-      return;
-    }
-
-    const updateVoices = () => {
-      try {
-        const vList = window.speechSynthesis.getVoices() || [];
-        if (vList.length > 0) {
-          setVoices(vList);
-        }
-      } catch (e) {
-        console.warn('Error loading voices:', e);
-      }
-    };
-
-    updateVoices();
-    if (window.speechSynthesis.onvoiceschanged !== undefined) {
-      window.speechSynthesis.onvoiceschanged = updateVoices;
-    }
-  }, []);
 
   const handleToggleAutoSpeak = () => {
     setAutoSpeak((prev) => {
@@ -358,22 +426,6 @@ export default function Query() {
     }
   };
 
-  // Clean up speech synthesis when component unmounts
-  useEffect(() => {
-    return () => {
-      isVoiceModeRef.current = false;
-      if (typeof window !== 'undefined' && window.speechSynthesis) {
-        try {
-          window.speechSynthesis.cancel();
-        } catch {}
-      }
-      if (recognitionRef.current) {
-        try {
-          recognitionRef.current.abort();
-        } catch {}
-      }
-    };
-  }, []);
 
   // Track if SpeechRecognition is actively listening
   const isListeningRef = useRef(false);
@@ -411,23 +463,198 @@ export default function Query() {
   }, []);
 
   /**
-   * Speak the answer aloud using browser SpeechSynthesis with multilingual accent selection
+   * Immediately stops all active neural audio and clears the sentence queue
    */
-  const speakAnswer = useCallback((textToSpeak, lang = 'English', fromVoiceMode = false) => {
-    if (typeof window === 'undefined' || !window.speechSynthesis) return;
+  const stopSpeaking = useCallback(() => {
+    // 1. Abort in-flight network request
+    if (activeAbortControllerRef.current) {
+      try {
+        activeAbortControllerRef.current.abort();
+      } catch {}
+      activeAbortControllerRef.current = null;
+    }
+
+    // 2. Clear sentence queue
+    audioQueueRef.current = [];
+    setCurrentSentenceIndex(0);
+    setTotalSentencesCount(0);
+
+    // 3. Pause and reset HTML5 audio element
+    if (audioRef.current) {
+      try {
+        audioRef.current.pause();
+        audioRef.current.currentTime = 0;
+      } catch {}
+    }
+
+    // 4. Revoke active blob URL
+    if (currentAudioUrlRef.current) {
+      try {
+        URL.revokeObjectURL(currentAudioUrlRef.current);
+      } catch {}
+      currentAudioUrlRef.current = null;
+    }
+
+    // 5. Cancel native SpeechSynthesis fallback if running
+    if (typeof window !== 'undefined' && window.speechSynthesis) {
+      try {
+        window.speechSynthesis.cancel();
+      } catch {}
+    }
+
+    setIsAudioPlaying(false);
+    setVoiceStatus('IDLE');
+  }, []);
+
+  // Clean up speech synthesis & audio when component unmounts
+  useEffect(() => {
+    return () => {
+      isVoiceModeRef.current = false;
+      stopSpeaking();
+      if (recognitionRef.current) {
+        try {
+          recognitionRef.current.abort();
+        } catch {}
+      }
+    };
+  }, [stopSpeaking]);
+
+  /**
+   * Browser SpeechSynthesis fallback if edge-tts backend is unreachable or times out
+   */
+  const fallbackSpeak = useCallback((sentence, lang) => {
+    if (typeof window === 'undefined' || !window.speechSynthesis) {
+      if (playNextChunkRef.current) playNextChunkRef.current();
+      return;
+    }
 
     try {
       window.speechSynthesis.cancel();
-      if (window.speechSynthesis.paused) {
-        window.speechSynthesis.resume();
-      }
-    } catch (e) {
-      console.warn('Speech synthesis cancel warning:', e);
-    }
-    setIsSpeechPaused(false);
+      const utterance = new SpeechSynthesisUtterance(sentence);
+      const currentVoices = window.speechSynthesis.getVoices() || [];
+      const isHindi = /[\u0900-\u097F]/.test(sentence) || (lang && lang.toLowerCase().includes('hi'));
 
-    const cleanText = cleanTextForTTS(textToSpeak);
-    if (!cleanText) {
+      if (isHindi) {
+        utterance.lang = 'hi-IN';
+        const hVoice = currentVoices.find((v) => v.lang.startsWith('hi') || v.name.toLowerCase().includes('hindi'));
+        if (hVoice) utterance.voice = hVoice;
+      } else {
+        utterance.lang = 'en-IN';
+        const engVoice = currentVoices.find((v) => v.lang.startsWith('en-IN') || v.lang.startsWith('en'));
+        if (engVoice) utterance.voice = engVoice;
+      }
+
+      utterance.onstart = () => {
+        setIsAudioPlaying(true);
+        setVoiceStatus('SPEAKING');
+      };
+      utterance.onend = () => {
+        setIsAudioPlaying(false);
+        if (playNextChunkRef.current) playNextChunkRef.current();
+      };
+      utterance.onerror = (e) => {
+        console.warn('Fallback SpeechSynthesis utterance error:', e);
+        setIsAudioPlaying(false);
+        if (playNextChunkRef.current) playNextChunkRef.current();
+      };
+
+      window.speechSynthesis.speak(utterance);
+    } catch (err) {
+      console.warn('Native speak exception:', err);
+      if (playNextChunkRef.current) playNextChunkRef.current();
+    }
+  }, []);
+
+  /**
+   * Plays the next sentence chunk from audioQueueRef sequentially
+   */
+  const playNextChunk = useCallback(async () => {
+    if (audioQueueRef.current.length === 0) {
+      // Completed full response
+      setVoiceStatus('IDLE');
+      setIsAudioPlaying(false);
+      setCurrentSentenceIndex(0);
+      setTotalSentencesCount(0);
+
+      if (currentAudioUrlRef.current) {
+        URL.revokeObjectURL(currentAudioUrlRef.current);
+        currentAudioUrlRef.current = null;
+      }
+
+      // Hands-free continuous loop: if user was in voice mode, resume listening
+      if (isVoiceModeSpeakingRef.current && isVoiceModeRef.current) {
+        startListening();
+      }
+      return;
+    }
+
+    const chunkText = audioQueueRef.current.shift();
+    setCurrentSentenceIndex((prev) => prev + 1);
+    setVoiceStatus('SPEAKING');
+
+    const controller = new AbortController();
+    activeAbortControllerRef.current = controller;
+    const timeoutId = setTimeout(() => {
+      controller.abort();
+    }, 10000); // 10s network timeout
+
+    try {
+      const isHindi = /[\u0900-\u097F]/.test(chunkText) || (currentLangRef.current && currentLangRef.current.toLowerCase().includes('hi'));
+      const res = await fetch(`${API_BASE_URL}/api/v1/tts`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          text: chunkText,
+          lang: isHindi ? 'hi' : 'en',
+        }),
+        signal: controller.signal,
+      });
+      clearTimeout(timeoutId);
+
+      if (!res.ok) {
+        throw new Error(`TTS HTTP status ${res.status}`);
+      }
+
+      const audioBlob = await res.blob();
+      if (!audioBlob || audioBlob.size === 0) {
+        throw new Error('Received empty audio blob from /api/v1/tts');
+      }
+
+      if (currentAudioUrlRef.current) {
+        URL.revokeObjectURL(currentAudioUrlRef.current);
+      }
+
+      const audioUrl = URL.createObjectURL(audioBlob);
+      currentAudioUrlRef.current = audioUrl;
+
+      if (audioRef.current) {
+        audioRef.current.src = audioUrl;
+        audioRef.current.load();
+        await audioRef.current.play();
+      }
+    } catch (err) {
+      clearTimeout(timeoutId);
+      if (err.name === 'AbortError') {
+        // Interrupted by user
+        return;
+      }
+      console.warn('Backend edge-tts call failed; falling back to browser SpeechSynthesis:', err);
+      fallbackSpeak(chunkText, currentLangRef.current);
+    }
+  }, [startListening, fallbackSpeak]);
+
+  useEffect(() => {
+    playNextChunkRef.current = playNextChunk;
+  }, [playNextChunk]);
+
+  /**
+   * Speak the answer aloud using backend edge-tts with sentence chunking & browser fallback
+   */
+  const speakAnswer = useCallback((textToSpeak, lang = 'English', fromVoiceMode = false) => {
+    stopSpeaking();
+
+    const chunks = splitIntoSentences(textToSpeak);
+    if (chunks.length === 0) {
       if (fromVoiceMode && isVoiceModeRef.current) {
         startListening();
       } else {
@@ -436,88 +663,23 @@ export default function Query() {
       return;
     }
 
-    const utterance = new SpeechSynthesisUtterance(cleanText);
-    activeUtteranceRef.current = utterance; // Prevent Chrome garbage collection bug
+    audioQueueRef.current = [...chunks];
+    currentLangRef.current = lang;
+    isVoiceModeSpeakingRef.current = fromVoiceMode;
+    setCurrentSentenceIndex(0);
+    setTotalSentencesCount(chunks.length);
 
-    const currentVoices = voices.length > 0 ? voices : (window.speechSynthesis.getVoices() || []);
-    const langLower = (lang || '').toLowerCase();
-    const hasDevanagari = /[\u0900-\u097F]/.test(cleanText);
-
-    // Multilingual Voice & Accent Resolution
-    if (hasDevanagari || langLower.includes('hindi')) {
-      utterance.lang = 'hi-IN';
-      const hindiVoice = currentVoices.find((v) => v.lang.startsWith('hi') || v.name.toLowerCase().includes('hindi'));
-      if (hindiVoice) utterance.voice = hindiVoice;
-    } else if (langLower.includes('hinglish')) {
-      // Hinglish is Romanized script: an Indian English voice or clear English voice delivers natural pronunciation
-      utterance.lang = 'en-IN';
-      const indianVoice = currentVoices.find(
-        (v) =>
-          v.lang === 'en-IN' ||
-          v.lang.startsWith('en-IN') ||
-          v.name.toLowerCase().includes('india') ||
-          v.name.toLowerCase().includes('heera') ||
-          v.name.toLowerCase().includes('ravi')
-      );
-      const fallbackEng = currentVoices.find((v) => v.lang.startsWith('en'));
-      if (indianVoice) {
-        utterance.voice = indianVoice;
-      } else if (fallbackEng) {
-        utterance.voice = fallbackEng;
-      }
-    } else {
-      utterance.lang = 'en-US';
-      const engVoice = currentVoices.find((v) => v.lang === 'en-US' || v.lang.startsWith('en'));
-      if (engVoice) utterance.voice = engVoice;
+    if (playNextChunkRef.current) {
+      playNextChunkRef.current();
     }
+  }, [stopSpeaking, startListening]);
 
-    utterance.rate = 1.0;
-    utterance.pitch = 1.0;
-
-    utterance.onstart = () => {
-      setVoiceStatus('SPEAKING');
-      setIsSpeechPaused(false);
-    };
-
-    utterance.onend = () => {
-      activeUtteranceRef.current = null;
-      setIsSpeechPaused(false);
-      if (fromVoiceMode && isVoiceModeRef.current) {
-        startListening();
-      } else {
-        setVoiceStatus('IDLE');
-      }
-    };
-
-    utterance.onerror = (e) => {
-      console.warn('Speech synthesis utterance error/ended:', e);
-      activeUtteranceRef.current = null;
-      setIsSpeechPaused(false);
-      if (fromVoiceMode && isVoiceModeRef.current) {
-        startListening();
-      } else {
-        setVoiceStatus('IDLE');
-      }
-    };
-
-    try {
-      window.speechSynthesis.speak(utterance);
-    } catch (err) {
-      console.warn('speechSynthesis.speak error:', err);
-      setVoiceStatus('IDLE');
+  const handleAudioEnded = () => {
+    setIsAudioPlaying(false);
+    if (playNextChunkRef.current) {
+      playNextChunkRef.current();
     }
-  }, [voices, startListening]);
-
-  const stopSpeaking = useCallback(() => {
-    if (typeof window !== 'undefined' && window.speechSynthesis) {
-      try {
-        window.speechSynthesis.cancel();
-      } catch {}
-    }
-    activeUtteranceRef.current = null;
-    setVoiceStatus('IDLE');
-    setIsSpeechPaused(false);
-  }, []);
+  };
 
   const endVoiceMode = useCallback(() => {
     isVoiceModeRef.current = false;
@@ -527,14 +689,13 @@ export default function Query() {
   }, [stopSpeaking, stopListening]);
 
   const togglePauseSpeech = () => {
-    if (typeof window === 'undefined' || !window.speechSynthesis) return;
-    if (isSpeechPaused) {
-      window.speechSynthesis.resume();
-      setIsSpeechPaused(false);
-      setVoiceStatus('SPEAKING');
+    if (!audioRef.current) return;
+    if (isAudioPlaying) {
+      audioRef.current.pause();
+      setIsAudioPlaying(false);
     } else {
-      window.speechSynthesis.pause();
-      setIsSpeechPaused(true);
+      audioRef.current.play().catch(() => {});
+      setIsAudioPlaying(true);
     }
   };
 
@@ -542,6 +703,24 @@ export default function Query() {
     endVoiceMode();
     logout();
     navigate('/login');
+  };
+
+  /**
+   * Combines result answer, explanation, and any fallback notice into a single spoken string
+   */
+  const getFullSpokenText = (data) => {
+    if (!data) return '';
+    const parts = [];
+    if (data.fallback_used && data.notice) {
+      parts.push(data.notice.trim());
+    }
+    if (data.answer) {
+      parts.push(data.answer.trim());
+    }
+    if (data.explanation) {
+      parts.push(data.explanation.trim());
+    }
+    return parts.join(' ');
   };
 
   /**
@@ -586,9 +765,10 @@ export default function Query() {
         ...h,
       ].slice(0, 8));
 
-      // Speak answer aloud if voice mode is active OR auto-speak is enabled
+      // Speak full answer + explanation aloud if voice mode is active OR auto-speak is enabled
       if ((fromVoice && isVoiceModeRef.current) || autoSpeak) {
-        speakAnswer(res.data.answer, res.data.language, Boolean(fromVoice && isVoiceModeRef.current));
+        const fullSpoken = getFullSpokenText(res.data);
+        speakAnswer(fullSpoken, res.data.language, Boolean(fromVoice && isVoiceModeRef.current));
       } else {
         setVoiceStatus('IDLE');
       }
@@ -622,9 +802,7 @@ export default function Query() {
 
       recognition.onstart = () => {
         isListeningRef.current = true;
-        if (typeof window !== 'undefined' && window.speechSynthesis) {
-          try { window.speechSynthesis.cancel(); } catch {}
-        }
+        stopSpeaking();
         setVoiceStatus('LISTENING');
       };
 
@@ -864,13 +1042,13 @@ export default function Query() {
                   return (
                     <div
                       key={src.id}
-                      className={`group flex items-start justify-between gap-2 p-2 rounded-lg border text-xs transition-colors ${
+                      className={`group flex items-center justify-between gap-2 p-2 rounded-lg border text-xs transition-colors ${
                         isSelected
                           ? 'bg-teal-950/30 border-teal-500/40 text-neutral-200'
                           : 'bg-neutral-950/50 border-neutral-800/80 text-neutral-500 hover:border-neutral-700'
                       }`}
                     >
-                      <label className="flex items-start gap-2 min-w-0 flex-1 cursor-pointer">
+                      <label className="flex items-center gap-2 min-w-0 flex-1 cursor-pointer">
                         <input
                           type="checkbox"
                           checked={isSelected}
@@ -892,13 +1070,14 @@ export default function Query() {
                         type="button"
                         disabled={isDeleting}
                         onClick={() => handleDeleteSource(src.id, src.filename)}
-                        className="opacity-0 group-hover:opacity-100 p-1 text-neutral-500 hover:text-red-400 transition-opacity cursor-pointer shrink-0"
+                        aria-label={`Delete source ${src.filename}`}
+                        className="w-8 h-8 min-w-[32px] min-h-[32px] flex items-center justify-center rounded-md text-neutral-400 opacity-60 hover:opacity-100 hover:text-red-400 hover:bg-red-500/10 focus:opacity-100 focus-visible:opacity-100 focus:outline-none focus-visible:outline focus-visible:outline-2 focus-visible:outline-red-500/80 focus-visible:outline-offset-1 transition-all cursor-pointer shrink-0 disabled:opacity-40 disabled:cursor-not-allowed"
                         title="Delete source permanently"
                       >
                         {isDeleting ? (
-                          <RefreshCw className="w-3 h-3 animate-spin text-red-400" />
+                          <RefreshCw className="w-3.5 h-3.5 animate-spin text-red-400" />
                         ) : (
-                          <Trash2 className="w-3 h-3" />
+                          <Trash2 className="w-3.5 h-3.5" />
                         )}
                       </button>
                     </div>
@@ -1045,10 +1224,17 @@ export default function Query() {
                       </>
                     )}
                     {voiceStatus === 'SPEAKING' && (
-                      <>
-                        <Volume2 className="w-3.5 h-3.5 text-teal-400 animate-bounce" />
-                        <span className="text-teal-300 font-semibold">🔊 Speaking answer aloud...</span>
-                      </>
+                      <div className="flex items-center gap-2.5">
+                        <AudioWaveform isPlaying={isAudioPlaying} />
+                        <span className="text-teal-300 font-semibold font-mono">
+                          🔊 Neural Speech (edge-tts)
+                        </span>
+                        {totalSentencesCount > 1 && (
+                          <span className="text-[10px] text-teal-400/80 bg-teal-900/50 px-1.5 py-0.5 rounded border border-teal-500/20">
+                            chunk {currentSentenceIndex}/{totalSentencesCount}
+                          </span>
+                        )}
+                      </div>
                     )}
                   </div>
                   {voiceStatus === 'SPEAKING' && (
@@ -1056,9 +1242,18 @@ export default function Query() {
                       <button
                         type="button"
                         onClick={togglePauseSpeech}
-                        className="px-2.5 py-1 rounded bg-neutral-900 hover:bg-neutral-800 text-[11px] text-neutral-300 border border-neutral-700 cursor-pointer"
+                        className="px-2.5 py-1 rounded bg-neutral-900 hover:bg-neutral-800 text-[11px] text-neutral-300 border border-neutral-700 cursor-pointer transition-colors"
                       >
-                        {isSpeechPaused ? 'Resume Audio' : 'Pause Audio'}
+                        {isAudioPlaying ? 'Pause' : 'Resume'}
+                      </button>
+                      <button
+                        type="button"
+                        onClick={stopSpeaking}
+                        className="flex items-center gap-1 px-2.5 py-1 rounded bg-red-950/70 hover:bg-red-900 text-[11px] text-red-300 border border-red-500/40 cursor-pointer transition-colors"
+                        title="Stop speech playback immediately"
+                      >
+                        <Square className="w-3 h-3 fill-current" />
+                        <span>Stop</span>
                       </button>
                     </div>
                   )}
@@ -1158,18 +1353,19 @@ export default function Query() {
                       {/* Manual Read Aloud Button */}
                       <button
                         type="button"
-                        onClick={() => (voiceStatus === 'SPEAKING' ? stopSpeaking() : speakAnswer(result.answer, result.language, false))}
-                        aria-label={voiceStatus === 'SPEAKING' ? 'Stop reading answer aloud' : 'Read answer aloud'}
+                        onClick={() => (voiceStatus === 'SPEAKING' ? stopSpeaking() : speakAnswer(getFullSpokenText(result), result.language, false))}
+                        aria-label={voiceStatus === 'SPEAKING' ? 'Stop reading answer aloud' : 'Read full answer and explanation aloud'}
                         className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg border text-xs font-medium transition-all cursor-pointer ${
                           voiceStatus === 'SPEAKING'
-                            ? 'bg-teal-950/90 border-teal-400 text-teal-300 animate-pulse shadow-md shadow-teal-500/20'
+                            ? 'bg-teal-950/90 border-teal-400 text-teal-300 shadow-md shadow-teal-500/20'
                             : 'bg-neutral-900 hover:bg-neutral-800 border-neutral-800 text-neutral-300 hover:text-teal-300'
                         }`}
-                        title={voiceStatus === 'SPEAKING' ? 'Stop reading aloud' : 'Read answer aloud with text-to-speech'}
+                        title={voiceStatus === 'SPEAKING' ? 'Stop reading aloud' : 'Read answer and concept explanation aloud'}
                       >
                         {voiceStatus === 'SPEAKING' ? (
                           <>
-                            <VolumeX className="w-3.5 h-3.5 text-teal-400" />
+                            <AudioWaveform isPlaying={isAudioPlaying} />
+                            <VolumeX className="w-3.5 h-3.5 text-teal-400 ml-1" />
                             <span>Stop Audio</span>
                           </>
                         ) : (
@@ -1406,6 +1602,21 @@ export default function Query() {
           </div>
         )}
       </AnimatePresence>
+
+      {/* Hidden Audio Element for Neural Edge-TTS Playback */}
+      <audio
+        ref={audioRef}
+        className="hidden"
+        preload="auto"
+        onPlay={() => setIsAudioPlaying(true)}
+        onPause={() => setIsAudioPlaying(false)}
+        onEnded={handleAudioEnded}
+        onError={(e) => {
+          console.warn('Audio playback error:', e);
+          setIsAudioPlaying(false);
+          handleAudioEnded();
+        }}
+      />
     </div>
   );
 }

@@ -27,37 +27,33 @@ Create a file named `.env` in the root folder: `CampusClimb/.env`
 # =================================================================
 # 1. Database Connection
 # =================================================================
-# Option A: MySQL (Default production/local setup)
-DATABASE_URL=mysql+pymysql://root:your_mysql_password@localhost:3306/campusclimb_nlp
+# Option A: MySQL (Default local setup)
+DATABASE_URL=mysql+pymysql://root:ihwhFQ2ipllOc8daQ5n8Ww@localhost:3306/campusclimb_nlp
 
-# Option B: SQLite (Zero-setup alternative if you don't have MySQL)
+# Option B: SQLite (Zero-setup alternative if your friend doesn't have MySQL)
 # DATABASE_URL=sqlite:///./campusclimb.db
 
 # =================================================================
 # 2. Supabase Authentication (Shared Project Keys)
 # =================================================================
-# Obtain from: Supabase Dashboard -> Project Settings -> API
-SUPABASE_URL=https://your-project-id.supabase.co
-SUPABASE_ANON_KEY=your-supabase-anon-key-here
-
-# JWT Secret (Project Settings -> API -> JWT Settings -> JWT Secret)
-# CRITICAL: Backend verifies client tokens using this secret
-SUPABASE_JWT_SECRET=your-supabase-jwt-secret-here
+SUPABASE_URL=https://fzbfbmcbvbjpyruiibgc.supabase.co
+SUPABASE_ANON_KEY=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZ6YmZibWNidmJqcHlydWlpYmdjIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODg5NzcwMzQsImV4cCI6MjEwNDU1MzAzNH0.fVk1pwn4073kqCkxYgMfz395rlVn7XwfXwzcDk5oi0g
+SUPABASE_JWT_SECRET=lnNLegpunFeZ1FRb72sm7ah6iqEvGCffTh2WlspPa05612bNUXXY/ff59z1/gzl1NgUH+ewDLs93yU/BgygW9g==
 
 # =================================================================
-# 3. Google Gemini API (Required for Agent Q&A /api/v1/agent/)
+# 3. Google Gemini API (Required for Agent Q&A)
 # =================================================================
-# Obtain a free key at: https://aistudio.google.com/app/apikey
-GEMINI_API_KEY=your-gemini-api-key-here
+GEMINI_API_KEY=your_gemini_api_key_here  # Paste from team lead or get free from https://aistudio.google.com/app/apikey
+GEMINI_MODEL=gemini-flash-lite-latest
 
 # =================================================================
 # 4. RAG Engine Network & Retry Settings
 # =================================================================
-RAG_HTTP_TIMEOUT=45.0
+RAG_HTTP_TIMEOUT=30.0
 RAG_MAX_RETRIES=2
 
 # =================================================================
-# 5. Optional / Networking
+# 5. Networking / CORS
 # =================================================================
 CORS_ORIGINS=http://localhost:5173,http://localhost:3000
 ```
@@ -71,9 +67,9 @@ Create a file named `.env` inside the `frontend` folder: `CampusClimb/frontend/.
 # Backend API Base URL
 VITE_API_URL=http://localhost:8000
 
-# Supabase Auth (Must match the same Supabase project used by the backend)
-VITE_SUPABASE_URL=https://your-project-id.supabase.co
-VITE_SUPABASE_ANON_KEY=your-supabase-anon-key-here
+# Supabase Auth
+VITE_SUPABASE_URL=https://fzbfbmcbvbjpyruiibgc.supabase.co
+VITE_SUPABASE_ANON_KEY=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZ6YmZibWNidmJqcHlydWlpYmdjIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODg5NzcwMzQsImV4cCI6MjEwNDU1MzAzNH0.fVk1pwn4073kqCkxYgMfz395rlVn7XwfXwzcDk5oi0g
 ```
 
 ---

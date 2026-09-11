@@ -32,6 +32,8 @@ Verified directly against `requirements.txt` and live `pip list`:
   - `httpx==0.28.1` (used for async non-blocking external auth and Gemini LLM calls)
   - `python-dotenv==1.0.1`
   - `python-multipart==0.0.20`
+- **Neural Text-to-Speech (TTS)**:
+  - `edge-tts>=7.0.0` (installed `7.2.8` with `aiohttp` in-memory MP3 neural streaming, Microsoft Neural Voices `hi-IN-SwaraNeural` and `en-IN-NeerjaNeural`)
 - **Templates & Views**: `Jinja2==3.1.5`
 
 #### Frontend (Node.js / React Single Page Application)
@@ -133,6 +135,8 @@ CampusClimb/
    - `POST /api/v1/agent/query`: Authenticated bilingual academic tutor. Embeds user query, finds top matching syllabus topic, fetches representative note chunks scoped to the current user, sanitizes query against prompt injection, and prompts Google Gemini (or generates a structured fallback) for bilingual explanations.
    - `GET /api/v1/agent/sources?subject=<name>`: Returns list of uploaded source files for the current user + subject (`{ sources: [{ id, filename, chunk_count }] }`) — used by the NotebookLM-style sources panel in `Query.jsx`.
    - `DELETE /api/v1/agent/sources/{source_id}`: Permanently deletes a source note and all its chunks for the authenticated user.
+5. **`app.routers.tts` (`/api/v1/tts`)**:
+   - `POST /api/v1/tts`: In-memory streaming neural text-to-speech endpoint. Accepts `{ text, lang, voice }`, dynamically resolves language/script (`hi-IN-SwaraNeural` for Hindi/Devanagari, `en-IN-NeerjaNeural` for Indian English), and yields streamed MP3 chunks with `audio/mpeg` media type. Requires zero external API keys or billing.
 
 ### Frontend: Client Routes in `App.jsx`
 - `/`: **Home** (`pages/Home.jsx`) — Landing page displaying platform features, research credibility benchmarks, and live system statistics fetched from `/api/v1/stats`.
@@ -247,18 +251,23 @@ CampusClimb delegates user authentication to **Supabase Auth**, supporting both 
 
 ---
 
-## 5. Known Issues / Incomplete Work
+## 5. Known Issues & Resolved Work
 
-1. **TTS reads only `answer` field (not `explanation`)**:
-   - [`frontend/src/pages/Query.jsx`](file:///c:/Users/rahul/Downloads/CampusClimb/frontend/src/pages/Query.jsx#L1161) `speakAnswer()` calls pass only `result.answer`. The `result.explanation` (conceptual depth) is not read aloud. Fix: compose `answer + explanation` before calling `speakAnswer()`.
-2. **Chrome TTS silent truncation**:
-   - `SpeechSynthesisUtterance` with long text is silently cut off by Chrome's ~200 word limit. Fix: split on sentence boundaries and queue utterances sequentially.
-3. **Hindi STT not captured**:
+### Resolved in Latest Session
+1. **[RESOLVED] TTS reads only `answer` field (not `explanation`)**:
+   - `getFullSpokenText()` in `Query.jsx` now composes `notice + answer + explanation` into a unified speech string with punctuation preserved.
+2. **[RESOLVED] Chrome TTS silent truncation**:
+   - Solved by implementing sentence chunking on `. ! ?` and Hindi purna viram `।`, streaming chunks sequentially into an HTML5 `<audio>` element with `onEnded` queue progression.
+3. **[RESOLVED] System TTS voice quality**:
+   - Replaced browser Web Speech Synthesis with backend neural TTS powered by `edge-tts` (Microsoft Neural Voices: `hi-IN-SwaraNeural` and `en-IN-NeerjaNeural`).
+4. **[RESOLVED] Delete-source button inaccessible on mobile & keyboard**:
+   - Removed `opacity-0 group-hover:opacity-100` pattern, enlarged tap target to $\ge 32\times 32\text{px}$, and added `focus-visible` focus ring.
+
+### Open Items
+1. **Hindi STT not captured**:
    - `recognition.lang = 'en-IN'` cannot capture Devanagari Hindi speech. Fix: detect language from recognized text or provide a lang toggle.
-4. **No response streaming**:
-   - The Gemini pipeline returns a complete JSON block after full generation. Users experience 9–36s of silence before any output. Streaming (`StreamingResponse` / SSE) would dramatically reduce perceived latency and improve voice mode naturalness.
-5. **System TTS voice quality**:
-   - Uses Windows OS system voices (robotic concatenative). Upgrading to Google Cloud TTS WaveNet (free tier: 4M chars/month) or ElevenLabs (free tier: 10k chars/month) would provide neural-quality emotional voice output.
+2. **No response streaming**:
+   - The Gemini pipeline returns a complete JSON block after full generation. Users experience wait time before initial output. Streaming (`StreamingResponse` / SSE) will reduce perceived latency.
 
 ---
 
@@ -440,3 +449,37 @@ Ran [`scratch/audit_hardcoding.py`](file:///c:/Users/rahul/Downloads/CampusClimb
 | A — Test fixtures | 57 |
 | B — Docs / comments / UI labels | 56 |
 | C — Config defaults / env vars | 8 |
+
+---
+
+### 8.6 Delete-Source Button Accessibility & Mobile Usability Fix
+
+- **Problem**: The delete button on source items in `Query.jsx` used `opacity-0 group-hover:opacity-100`, making it invisible on touch devices, undiscoverable on mobile, and unreachable via keyboard navigation.
+- **Fix**:
+  - Replaced hover-only hiding with default persistent `opacity-60`, highlighting to `opacity-100` on hover/focus.
+  - Increased button footprint to $\ge 32\times 32\text{px}$ (`w-8 h-8 min-w-[32px] min-h-[32px]`) with centered icon.
+  - Added explicit focus ring: `focus:outline-none focus-visible:outline focus-visible:outline-2 focus-visible:outline-red-500/80 focus-visible:outline-offset-1`.
+  - Added descriptive `aria-label={`Delete source ${src.filename}`}`.
+  - Audited `Query.jsx` and `Upload.jsx`; confirmed no other action buttons use hidden hover-only patterns.
+- **Verification**: Verified via Playwright automation: 32x32px measured bounding box, keyboard Tab focus detection, and mobile touch tap triggering delete confirmation dialog.
+
+---
+
+### 8.7 Edge-TTS Backend Neural Voice Integration & Sentence-Chunk Streaming
+
+- **Problem**: Browser-native Web Speech Synthesis sounded robotic/synthetic, truncated responses silently on long texts (>200 words), and read only the `answer` omitting the `explanation`.
+- **Backend Architecture**:
+  - Added `edge-tts>=7.0.0` to `requirements.txt`.
+  - Created [`app/routers/tts.py`](file:///c:/Users/rahul/Downloads/CampusClimb/app/routers/tts.py) registering `POST /api/v1/tts`.
+  - Microsoft Neural Voices: `"hi-IN-SwaraNeural"` (Hindi) and `"en-IN-NeerjaNeural"` (Indian English).
+  - Uses in-memory generator yielding raw MP3 frames directly into `StreamingResponse(media_type="audio/mpeg")` with header `X-TTS-Voice`.
+  - Includes IPv4 socket connector (`family=socket.AF_INET`) to prevent Windows IPv6 dual-stack delays.
+- **Frontend Architecture**:
+  - Replaced `speechSynthesis.speak()` with HTML5 `<audio ref={audioRef} />` playing object URLs.
+  - `getFullSpokenText()` combines `notice` + `answer` + `explanation`.
+  - `splitIntoSentences()` chunks text on `. ! ?` and Hindi purna viram `।` (`\u0964`).
+  - Escaped hyphen in bullet-stripping regex (`^[\s*•\-]+\s+`) to prevent matching Devanagari Unicode character range (`U+0900`–`U+097F`).
+  - Chunks play sequentially via an active queue (`audioQueueRef`) advancing on `onEnded`.
+  - Fail-safe fallback to `window.speechSynthesis` via `fallbackSpeak()` if network fails.
+  - Real-time animated audio waveform, sentence chunk counter (`chunk X/Y`), Pause/Resume, and Stop controls.
+- **Verification**: Verified end-to-end with real Hindi query (`"ऑपरेटिंग सिस्टम क्या है?"`), generating 6 sequential chunks totaling 299,088 valid MP3 bytes (~18 seconds of fluent neural speech) with full UI playback in Edge browser.

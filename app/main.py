@@ -30,7 +30,7 @@ logger = logging.getLogger("campusclimb")
 
 from app.database import engine, Base
 from app.models import Subject, SyllabusTopic, Note, NoteChunk, PYQ, TopicImportance  # noqa: F401
-from app.routers import auth, dashboard, upload, agent
+from app.routers import auth, dashboard, upload, agent, tts
 from core.embeddings import get_embedding
 from config import MODEL_NAME
 
@@ -141,3 +141,4 @@ app.include_router(auth.router)
 app.include_router(upload.router)
 app.include_router(dashboard.router)
 app.include_router(agent.router)
+app.include_router(tts.router)
