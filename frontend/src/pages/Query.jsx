@@ -6,11 +6,13 @@ import {
   AlertTriangle, Clock, Trash2, Languages, BookOpen, ChevronRight,
   UploadCloud, CheckCircle2, X, Copy, Check, FileText,
   Mic, Layers, HelpCircle,
-  Cpu, BookCheck, Volume2, VolumeX, Plus, Square, Pause, Play
+  Cpu, BookCheck, Volume2, VolumeX, Plus, Square, Pause, Play,
+  PhoneCall, Phone
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import axios from 'axios';
 import mermaid from 'mermaid';
+import AITeacherCallModal from '../components/ai-teacher/AITeacherCallModal';
 
 const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000';
 const DEFAULT_SUBJECTS = ['Operating Systems', 'DBMS', 'Computer Networks', 'Research'];
@@ -304,6 +306,7 @@ export default function Query() {
   const [currentSentenceIndex, setCurrentSentenceIndex] = useState(0);
   const [totalSentencesCount, setTotalSentencesCount] = useState(0);
   const [speechSupported, setSpeechSupported] = useState(true);
+  const [isTeacherCallOpen, setIsTeacherCallOpen] = useState(false);
   const [autoSpeak, setAutoSpeak] = useState(() => {
     return localStorage.getItem('campusclimb_autospeak') === 'true';
   });
@@ -911,33 +914,34 @@ export default function Query() {
     <div className="min-h-screen bg-[#070707] text-neutral-100 flex flex-col font-sans selection:bg-teal-500/20 selection:text-teal-300">
       {/* ── Top Navbar ── */}
       <header className="border-b border-neutral-800/80 bg-[#0a0a0a]/80 backdrop-blur-md sticky top-0 z-40">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 h-16 flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <Link to="/dashboard" className="flex items-center gap-2 group">
-              <div className="p-2 rounded-lg bg-teal-950/60 border border-teal-500/30 group-hover:border-teal-400 transition-colors">
-                <Terminal className="w-5 h-5 text-teal-400" />
+        <div className="max-w-7xl mx-auto px-3 sm:px-6 h-16 flex items-center justify-between">
+          <div className="flex items-center gap-2 sm:gap-3 min-w-0">
+            <Link to="/dashboard" className="flex items-center gap-2 group shrink-0">
+              <div className="p-1.5 sm:p-2 rounded-lg bg-teal-950/60 border border-teal-500/30 group-hover:border-teal-400 transition-colors">
+                <Terminal className="w-4 h-4 sm:w-5 sm:h-5 text-teal-400" />
               </div>
-              <span className="font-mono font-bold text-sm tracking-wide text-neutral-200">
+              <span className="font-mono font-bold text-xs sm:text-sm tracking-wide text-neutral-200">
                 CAMPUS<span className="text-teal-400">CLIMB</span>
               </span>
             </Link>
-            <span className="text-neutral-600 font-mono text-xs">/</span>
-            <span className="text-xs text-teal-400 font-mono font-semibold tracking-wider">
+            <span className="text-neutral-600 font-mono text-xs hidden sm:inline">/</span>
+            <span className="text-xs text-teal-400 font-mono font-semibold tracking-wider hidden sm:inline">
               AGENT Q&amp;A
             </span>
           </div>
 
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-1.5 sm:gap-3 shrink-0">
             <Link
               to={`/upload?subject=${encodeURIComponent(subject)}`}
-              className="flex items-center gap-1.5 text-xs text-neutral-400 hover:text-teal-300 bg-neutral-900 hover:bg-neutral-800 border border-neutral-800 px-3 py-1.5 rounded-lg transition-colors cursor-pointer"
+              className="flex items-center gap-1.5 text-xs text-neutral-400 hover:text-teal-300 bg-neutral-900 hover:bg-neutral-800 border border-neutral-800 px-2 sm:px-3 py-1.5 rounded-lg transition-colors cursor-pointer"
+              title="Upload Notes"
             >
               <UploadCloud className="w-3.5 h-3.5" />
               <span className="hidden sm:inline">Upload Notes</span>
             </Link>
             <Link
               to={`/dashboard?subject=${encodeURIComponent(subject)}`}
-              className="text-xs text-neutral-400 hover:text-white px-3 py-1.5 rounded-lg border border-neutral-800 bg-neutral-900/50 hover:bg-neutral-800 transition-colors"
+              className="text-xs text-neutral-400 hover:text-white px-2 sm:px-3 py-1.5 rounded-lg border border-neutral-800 bg-neutral-900/50 hover:bg-neutral-800 transition-colors"
             >
               Dashboard
             </Link>
@@ -945,6 +949,7 @@ export default function Query() {
               onClick={handleLogout}
               className="p-1.5 text-neutral-400 hover:text-red-400 rounded-lg hover:bg-neutral-900 transition-colors cursor-pointer"
               title="Logout"
+              aria-label="Logout"
             >
               <LogOut className="w-4 h-4" />
             </button>
@@ -1113,6 +1118,41 @@ export default function Query() {
                 </button>
               </motion.div>
             )}
+
+            {/* Call Your AI Teacher CTA Banner (Section 4) */}
+            <motion.div
+              whileHover={{ scale: 1.008 }}
+              className="relative overflow-hidden rounded-xl border border-teal-500/40 bg-gradient-to-r from-teal-950/70 via-neutral-900/90 to-teal-950/50 p-4 sm:p-5 flex items-center justify-between gap-4 shadow-xl shadow-teal-950/40 backdrop-blur-md"
+            >
+              <div className="flex items-center gap-3.5">
+                <div className="w-11 h-11 rounded-xl bg-teal-500/20 border border-teal-500/40 flex items-center justify-center text-teal-300 shadow-lg shadow-teal-500/20 shrink-0">
+                  <PhoneCall className="w-5 h-5 text-teal-400 animate-pulse" />
+                </div>
+                <div>
+                  <h3 className="text-sm sm:text-base font-semibold text-neutral-100 flex items-center gap-2">
+                    <span>Call Your AI Teacher</span>
+                    <span className="text-[10px] uppercase font-mono px-2 py-0.5 rounded-full bg-teal-500/20 text-teal-300 border border-teal-500/40 font-bold tracking-wider">
+                      LIVE VOICE
+                    </span>
+                  </h3>
+                  <p className="text-xs text-neutral-400 font-sans mt-0.5">
+                    Talk naturally with your AI Teacher using your notes in Hindi, English, or Hinglish.
+                  </p>
+                </div>
+              </div>
+
+              <button
+                type="button"
+                onClick={() => {
+                  stopSpeaking();
+                  setIsTeacherCallOpen(true);
+                }}
+                className="flex items-center gap-2 px-4 py-2.5 rounded-lg bg-teal-600 hover:bg-teal-500 text-white text-xs sm:text-sm font-semibold tracking-wide shadow-lg shadow-teal-600/30 transition-all cursor-pointer shrink-0"
+              >
+                <Phone className="w-4 h-4" />
+                <span>Start Call</span>
+              </button>
+            </motion.div>
 
             {/* Query Form & Voice Loop Control */}
             <div className="glass-card rounded-xl p-5 border border-neutral-800 space-y-4 shadow-xl">
@@ -1616,6 +1656,17 @@ export default function Query() {
           setIsAudioPlaying(false);
           handleAudioEnded();
         }}
+      />
+
+      {/* AI Teacher Call Overlay Modal */}
+      <AITeacherCallModal
+        isOpen={isTeacherCallOpen}
+        onClose={() => setIsTeacherCallOpen(false)}
+        subject={subject}
+        selectedSourceIds={selectedSourceIds}
+        token={token}
+        initialHistory={history}
+        onSyncHistory={(newEntry) => setHistory((h) => [newEntry, ...h].slice(0, 8))}
       />
     </div>
   );

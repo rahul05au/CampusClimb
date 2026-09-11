@@ -56,11 +56,17 @@ class RateLimiter:
 
 
 # Global instances
-# AI Agent routes: 10 calls / 60 seconds
-ai_rate_limiter = RateLimiter(requests_per_window=10, window_seconds=60)
+# AI Agent routes: configurable via AI_RATE_LIMIT (default 60 calls / 60 seconds for smooth demo)
+ai_rate_limiter = RateLimiter(
+    requests_per_window=int(os.getenv("AI_RATE_LIMIT", "60")),
+    window_seconds=60
+)
 
-# Auth routes: 5 attempts / 60 seconds (brute-force protection)
-auth_rate_limiter = RateLimiter(requests_per_window=5, window_seconds=60)
+# Auth routes: configurable via AUTH_RATE_LIMIT (default 30 attempts / 60 seconds)
+auth_rate_limiter = RateLimiter(
+    requests_per_window=int(os.getenv("AUTH_RATE_LIMIT", "30")),
+    window_seconds=60
+)
 
 # Upload routes: configurable via UPLOAD_RATE_LIMIT (default 30 uploads / 60 seconds)
 upload_rate_limiter = RateLimiter(

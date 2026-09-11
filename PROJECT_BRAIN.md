@@ -1,7 +1,7 @@
 # CampusClimb — Project Brain & Single Source of Truth
 
 > **System Status**: Production-Ready / Research-Validated  
-> **Last Verified & Synced**: September 11, 2026 (Post-session sync — data-sync fix, Query page overhaul, Gemini retry hardening, voice audit)  
+> **Last Verified & Synced**: September 11, 2026 (Pre-Demo Regression & Final Hardening — AI Teacher Live Voice Call Suite, Rate Limiter Expansion, Mobile Overhaul, 80/80 Backend Tests PASS)  
 > **Target Audience**: AI Coding Assistants & Human Engineers working on CampusClimb.
 
 ---
@@ -74,6 +74,7 @@ CampusClimb/
 │   │   ├── agent.py                    # Bilingual Q&A endpoint (/api/v1/agent/query)
 │   │   ├── auth.py                     # Managed auth endpoints (/api/v1/auth/signup, /login, /me)
 │   │   ├── dashboard.py                # Aggregated metrics & telemetry (/api/v1/dashboard, /api/v1/stats)
+│   │   ├── tts.py                      # Neural text-to-speech endpoint (/api/v1/tts)
 │   │   └── upload.py                   # Multipart upload handlers (/upload/syllabus, /notes, /pyqs, /api/v1/subjects)
 │   ├── static/                         # Static CSS fallback
 │   └── templates/                      # Jinja2 HTML server templates fallback
@@ -96,6 +97,7 @@ CampusClimb/
 │       ├── index.css                   # Tailwind v4 import, theme CSS variables, dark/light definitions
 │       ├── main.jsx                    # React DOM entry point
 │       ├── components/                 # Reusable UI components (Navbar, Footer, HeroSection, etc.)
+│       │   └── ai-teacher/             # Live voice AI teacher modal, teacher orb, captions, controls, quick actions
 │       ├── context/
 │       │   └── AuthContext.jsx         # Session state, onAuthStateChange listener, getToken() helper
 │       ├── lib/
@@ -483,3 +485,49 @@ Ran [`scratch/audit_hardcoding.py`](file:///c:/Users/rahul/Downloads/CampusClimb
   - Fail-safe fallback to `window.speechSynthesis` via `fallbackSpeak()` if network fails.
   - Real-time animated audio waveform, sentence chunk counter (`chunk X/Y`), Pause/Resume, and Stop controls.
 - **Verification**: Verified end-to-end with real Hindi query (`"ऑपरेटिंग सिस्टम क्या है?"`), generating 6 sequential chunks totaling 299,088 valid MP3 bytes (~18 seconds of fluent neural speech) with full UI playback in Edge browser.
+
+---
+
+### 8.8 "Call Your AI Teacher" Live Voice State Machine & Neural Conversational Suite
+
+- **Motivation**: Moving beyond static text queries, university students learn faster through real-time conversational dialogue in their native vernacular (Hindi, Indian English, Hinglish) grounded strictly in their uploaded lecture notes.
+- **Frontend Architecture (`frontend/src/components/ai-teacher/`)**:
+  - [`AITeacherCallModal.jsx`](file:///c:/Users/rahul/Downloads/CampusClimb/frontend/src/components/ai-teacher/AITeacherCallModal.jsx): Full-screen conversational overlay with backdrop blur, keyboard accessibility, and state machine lifecycle: `CALLING` -> `CONNECTED` -> `LISTENING` -> `THINKING` -> `SPEAKING` -> `ERROR` / `IDLE`.
+  - [`TeacherOrb.jsx`](file:///c:/Users/rahul/Downloads/CampusClimb/frontend/src/components/ai-teacher/TeacherOrb.jsx): Organic animated visualizer representing teacher voice states (pulsing waves for speaking, rotating particles for thinking, gentle idle breathing).
+  - [`CallCaptions.jsx`](file:///c:/Users/rahul/Downloads/CampusClimb/frontend/src/components/ai-teacher/CallCaptions.jsx): Dual real-time captioning displaying student transcript (interim + final) and teacher response with sentence-by-sentence karaoke highlighting.
+  - [`CallControls.jsx`](file:///c:/Users/rahul/Downloads/CampusClimb/frontend/src/components/ai-teacher/CallControls.jsx): Bottom control bar featuring duration timer, mic mute/unmute, instant teacher interruption (`handleInterrupt`), language switcher (`auto` / `hi-IN` / `en-IN`), and clean call termination (`handleEndCall`).
+  - [`CallQuickActions.jsx`](file:///c:/Users/rahul/Downloads/CampusClimb/frontend/src/components/ai-teacher/CallQuickActions.jsx): Context-aware 1-tap guidance pills:
+    - *"Explain Simpler"* (`सरल भाषा में`): Requests beginner-friendly analogies.
+    - *"Real-World Example"* (`Practical Example`): Requests concrete industrial/practical use-cases.
+    - *"Explain in Hindi"* / *"English Summary"*: Dynamic bidirectional vernacular translation.
+    - *"Quiz Me"* (`मुझसे Quiz लो`): Prompts the AI teacher to ask a conceptual question to test student retention.
+- **Interruption & Disconnect Protection**:
+  - `handleInterrupt`: Aborts pending audio fetches, drains `audioQueueRef`, resets teacher audio, and immediately re-enables microphone listening.
+  - `add_security_headers` middleware in `app/main.py`: Gracefully handles client disconnects or aborted streams by returning HTTP 204 instead of throwing unhandled broken pipe exceptions.
+- **Verification**: Verified live via Playwright test with real Hindi speech (`"प्रोसेस और थ्रेड में क्या मुख्य अंतर है?"`), receiving HTTP 200, 30,672 bytes of neural MP3 streaming audio, automatic follow-up listening, Quick Action execution, and clean hang-up.
+
+---
+
+### 8.9 Pre-Demo End-to-End Regression & Full Stack Quality Audit
+
+- **13/13 User Flow Steps Verified Live**:
+  1. Landing Page (`/`): PASS (Hero, brand assets, CTA routing).
+  2. Signup: PASS (Supabase Auth user registration with unique email).
+  3. Login: PASS (Authenticated session with JWT verification).
+  4. Google OAuth: PASS (Google brand mark button with Supabase OAuth provider hook).
+  5. PDF Upload & Dedup: PASS (`operating_systems_notes.pdf` uploaded, chunked, deduplicated with 356 duplicates filtered, auto-advanced to Step 3 PYQ).
+  6. Dashboard: PASS (5 telemetry cards, clean merged notes without raw PDF artifacts, dynamic DBMS subject switching).
+  7. Notes-Grounded Query: PASS (*"What is CPU scheduling and process state?"* -> 94% High confidence, `📚 From Your Notes`, 5 citation pills).
+  8. General Knowledge Fallback: PASS (*"What is quantum computing qubit superposition?"* -> `⚡ General Knowledge` badge, conceptual explanation without hallucinated citations).
+  9. AI Teacher Voice Call: PASS (Hindi STT, 30,672 bytes Edge-TTS audio, auto-listening, Quick Action "Explain Simpler", clean hang-up).
+  10. Post-Call Query Integrity: PASS (Text query executed smoothly after call with zero DOM/audio corruption).
+  11. Sign Out: PASS (Session cleared, redirected to `/login`).
+  12. Console Audit: PASS/WARNING (0 fatal exceptions, 2 non-fatal Supabase registration rate-limits).
+  13. Mobile Viewport (390x844): PASS (Login = 390px, Dashboard = 390px, Query = 390px, Call Modal = 390px — zero horizontal overflow).
+- **Backend Test Suite**: `pytest core/tests` -> **80 / 80 passed in 20.67s (100% pass rate)**.
+- **Frontend Production Build**: `npm run build` -> Clean build in **2.03s** (zero errors).
+- **Security & Config**:
+  - Both root `.gitignore` and `frontend/.gitignore` ignore all `.env` files (`git status --ignored -s` confirmed).
+  - Re-grepped codebase for `eyJ` -> 0 hardcoded demo tokens or backdoors found.
+  - Rate limiters expanded in `app/rate_limiter.py` (`ai_rate_limiter = 60 req/min`, `auth_rate_limiter = 30 req/min`).
+

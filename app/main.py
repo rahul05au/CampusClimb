@@ -102,7 +102,13 @@ app.add_middleware(GZipMiddleware, minimum_size=1000)
 # Security Response Headers Middleware
 @app.middleware("http")
 async def add_security_headers(request: Request, call_next):
-    response = await call_next(request)
+    try:
+        response = await call_next(request)
+    except Exception as exc:
+        if "No response returned" in str(exc):
+            from starlette.responses import Response
+            return Response(status_code=204)
+        raise
     response.headers["X-Content-Type-Options"] = "nosniff"
     response.headers["X-Frame-Options"] = "DENY"
     response.headers["X-XSS-Protection"] = "1; mode=block"

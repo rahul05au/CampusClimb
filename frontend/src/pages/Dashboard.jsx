@@ -192,40 +192,44 @@ export default function Dashboard() {
   return (
     <div className="min-h-screen bg-[#0a0a0a] text-neutral-100 font-mono flex flex-col selection:bg-teal-600 selection:text-white">
       {/* Header */}
-      <header className="border-b border-neutral-800 bg-[#0a0a0a]/90 backdrop-blur-md px-6 py-4 flex items-center justify-between sticky top-0 z-50">
-        <Link to="/" className="flex items-center gap-3">
-          <div className="w-8 h-8 rounded-lg bg-neutral-900 border border-neutral-800 flex items-center justify-center">
+      <header className="border-b border-neutral-800 bg-[#0a0a0a]/90 backdrop-blur-md px-3 sm:px-6 py-3 sm:py-4 flex items-center justify-between sticky top-0 z-50">
+        <Link to="/" className="flex items-center gap-2 sm:gap-3 min-w-0">
+          <div className="w-7 h-7 sm:w-8 sm:h-8 rounded-lg bg-neutral-900 border border-neutral-800 flex items-center justify-center shrink-0">
             <Terminal className="w-4 h-4 text-teal-400" />
           </div>
-          <span className="text-base font-bold tracking-tight text-white font-mono">
-            CampusClimb <span className="text-xs text-teal-400 font-normal">/ Student Dashboard</span>
+          <span className="text-sm sm:text-base font-bold tracking-tight text-white font-mono truncate">
+            CampusClimb <span className="text-xs text-teal-400 font-normal hidden sm:inline">/ Student Dashboard</span>
           </span>
         </Link>
 
-        <div className="flex items-center gap-4 text-xs">
+        <div className="flex items-center gap-1.5 sm:gap-4 text-xs shrink-0">
           <Link
             to={`/upload?subject=${encodeURIComponent(selectedSubject)}`}
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-neutral-900 hover:bg-neutral-800 border border-neutral-800 text-neutral-300 transition-colors"
+            className="flex items-center gap-1.5 px-2 sm:px-3 py-1.5 rounded-lg bg-neutral-900 hover:bg-neutral-800 border border-neutral-800 text-neutral-300 transition-colors"
+            title="Upload Notes"
           >
             <UploadCloud className="w-3.5 h-3.5 text-teal-400" />
-            <span>Upload Notes</span>
+            <span className="hidden sm:inline">Upload Notes</span>
           </Link>
           <Link
             to={`/query?subject=${encodeURIComponent(selectedSubject)}`}
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-teal-950/80 hover:bg-teal-900 border border-teal-500/30 text-teal-300 font-medium transition-colors"
+            className="flex items-center gap-1.5 px-2 sm:px-3 py-1.5 rounded-lg bg-teal-950/80 hover:bg-teal-900 border border-teal-500/30 text-teal-300 font-medium transition-colors"
+            title="Query Engine"
           >
             <Sparkles className="w-3.5 h-3.5" />
-            <span>Query Engine</span>
+            <span className="hidden sm:inline">Query Engine</span>
           </Link>
-          <span className="text-neutral-400 hidden sm:inline">
+          <span className="text-neutral-400 hidden lg:inline">
             User: <span className="text-teal-400 font-semibold">{user?.email || 'Authenticated Student'}</span>
           </span>
           <button
             onClick={handleLogout}
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-neutral-900 hover:bg-neutral-800 border border-neutral-800 text-neutral-300 transition-colors"
+            aria-label="Sign Out"
+            title="Sign Out"
+            className="flex items-center gap-1.5 px-2 sm:px-3 py-1.5 rounded-lg bg-neutral-900 hover:bg-neutral-800 border border-neutral-800 text-neutral-300 hover:text-red-400 transition-colors cursor-pointer"
           >
             <LogOut className="w-3.5 h-3.5" />
-            <span>Sign Out</span>
+            <span className="hidden sm:inline">Sign Out</span>
           </button>
         </div>
       </header>
