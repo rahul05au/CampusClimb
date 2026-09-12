@@ -47,3 +47,6 @@ scratch/
 *.bin
 *.onnx
 research/models/
+
+START_MYSQL.bat
+
