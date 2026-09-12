@@ -52,16 +52,26 @@ function DrawCheckIcon() {
   );
 }
 
+// Dynamic file size formatting helper (avoids misleading 0.00 MB for small valid PDFs)
+const formatFileSize = (bytes) => {
+  if (bytes === undefined || bytes === null) return '0 B';
+  const num = Number(bytes);
+  if (isNaN(num) || num <= 0) return '0 B';
+  if (num < 1024) return `${num} B`;
+  if (num < 1024 * 1024) return `${(num / 1024).toFixed(1)} KB`;
+  return `${(num / (1024 * 1024)).toFixed(2)} MB`;
+};
+
 // File Preview Chip Component
 function FilePreviewChip({ file, onRemove }) {
   if (!file) return null;
-  const sizeMB = (file.size / (1024 * 1024)).toFixed(2);
+  const formattedSize = formatFileSize(file.size);
   return (
     <div className="flex items-center justify-between bg-neutral-900 border border-teal-500/40 rounded-lg p-3 text-xs text-neutral-200">
       <div className="flex items-center gap-2.5 truncate">
         <FileText className="w-4 h-4 text-teal-400 shrink-0" />
         <span className="truncate font-semibold">{file.name}</span>
-        <span className="text-neutral-500 text-[11px] shrink-0">({sizeMB} MB)</span>
+        <span className="text-neutral-500 text-[11px] shrink-0">({formattedSize})</span>
       </div>
       <button
         type="button"
@@ -82,13 +92,17 @@ function UploadDropZone({ onFileSelected, error, loading, progress, stageText, p
 
   const validateAndSet = (file) => {
     if (!file) return;
+    if (file.size === 0) {
+      onFileSelected(null, 'The selected file is empty (0 bytes). Please choose a valid PDF.');
+      return;
+    }
     const isPdf = file.type === 'application/pdf' || file.name.toLowerCase().endsWith('.pdf');
     if (!isPdf) {
       onFileSelected(null, `Invalid file format "${file.name}". Only PDF documents are allowed.`);
       return;
     }
     if (file.size > MAX_FILE_SIZE_BYTES) {
-      onFileSelected(null, `File size (${(file.size / (1024 * 1024)).toFixed(1)}MB) exceeds max limit of ${MAX_FILE_SIZE_MB}MB.`);
+      onFileSelected(null, `File size (${formatFileSize(file.size)}) exceeds max limit of ${MAX_FILE_SIZE_MB}MB.`);
       return;
     }
     onFileSelected(file, '');
@@ -311,10 +325,11 @@ export default function Upload() {
       const detail = err.response.data?.detail;
       if (status === 401) return 'Your session expired. Please sign in again.';
       if (status === 403) return "You don't have permission to access this resource.";
+      if (status === 413) return typeof detail === 'string' ? detail : 'File size exceeds upload limit.';
       if (status === 422) return 'Please check the selected file/subject format.';
-      if (status >= 500) return 'Upload service is temporarily unavailable. Please retry.';
-      if (typeof detail === 'string') return detail;
+      if (typeof detail === 'string' && detail.trim()) return detail;
       if (detail && typeof detail === 'object') return JSON.stringify(detail);
+      if (status >= 500) return 'Upload service encountered an internal error. Please retry.';
     }
     if (err.message && err.message.toLowerCase().includes('network error')) {
       return 'Connection lost. Check your internet connection and retry.';

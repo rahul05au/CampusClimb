@@ -229,9 +229,16 @@ async def get_subjects(
         .all()
     ]
 
+    # Query Subject catalog first
+    catalog_subjects = [
+        row[0] for row in db.query(Subject.name)
+        .order_by(Subject.name)
+        .all()
+    ]
+
     subject_names = []
     seen = set()
-    for name in [*user_subjects, *syllabus_subjects]:
+    for name in [*catalog_subjects, *user_subjects, *syllabus_subjects]:
         if name and name not in seen:
             subject_names.append(name)
             seen.add(name)
@@ -239,7 +246,9 @@ async def get_subjects(
     if not subject_names:
         defaults = ["Operating Systems", "DBMS", "Computer Networks", "Research"]
         for d in defaults:
-            db.add(Subject(name=d))
+            existing = db.query(Subject).filter(Subject.name == d).first()
+            if not existing:
+                db.add(Subject(name=d))
         db.commit()
         subject_names = defaults
 
@@ -347,7 +356,13 @@ async def upload_syllabus(
                 status_code=400,
                 detail="Syllabus Format Error: No unit/topic structure found in PDF (expected 'UNIT N: Name' followed by '- Topic' lines). If you are uploading lecture notes or study material, please switch to Step 2 (Lecture Notes).",
             )
-        raise HTTPException(status_code=400, detail="Error processing syllabus. Please check the file format.")
+        err_type = type(e).__name__
+        if "OperationalError" in err_type or "Can't connect" in msg or "Connection refused" in msg or "2003" in msg:
+            raise HTTPException(
+                status_code=503,
+                detail="Database service connection refused. Please ensure MySQL database is running.",
+            )
+        raise HTTPException(status_code=500, detail="Server error occurred while processing syllabus. Please retry.")
     finally:
         _cleanup(filepath)
 

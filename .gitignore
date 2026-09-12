@@ -29,6 +29,7 @@ uploads/
 *.db
 *.sqlite
 *.sqlite3
+local_mysql/
 
 # Logs
 logs/
