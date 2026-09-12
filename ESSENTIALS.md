@@ -28,7 +28,7 @@ Create a file named `.env` in the root folder: `CampusClimb/.env`
 # 1. Database Connection
 # =================================================================
 # Option A: MySQL (Default local setup)
-DATABASE_URL=mysql+pymysql://root:ihwhFQ2ipllOc8daQ5n8Ww@localhost:3306/campusclimb_nlp
+DATABASE_URL=mysql+pymysql://root:your_mysql_password@localhost:3306/campusclimb_nlp
 
 # Option B: SQLite (Zero-setup alternative if your friend doesn't have MySQL)
 # DATABASE_URL=sqlite:///./campusclimb.db
@@ -36,9 +36,9 @@ DATABASE_URL=mysql+pymysql://root:ihwhFQ2ipllOc8daQ5n8Ww@localhost:3306/campuscl
 # =================================================================
 # 2. Supabase Authentication (Shared Project Keys)
 # =================================================================
-SUPABASE_URL=https://fzbfbmcbvbjpyruiibgc.supabase.co
-SUPABASE_ANON_KEY=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZ6YmZibWNidmJqcHlydWlpYmdjIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODg5NzcwMzQsImV4cCI6MjEwNDU1MzAzNH0.fVk1pwn4073kqCkxYgMfz395rlVn7XwfXwzcDk5oi0g
-SUPABASE_JWT_SECRET=lnNLegpunFeZ1FRb72sm7ah6iqEvGCffTh2WlspPa05612bNUXXY/ff59z1/gzl1NgUH+ewDLs93yU/BgygW9g==
+SUPABASE_URL=https://your-project.supabase.co
+SUPABASE_ANON_KEY=your_supabase_anon_key_here
+SUPABASE_JWT_SECRET=your_supabase_jwt_secret_here
 
 # =================================================================
 # 3. Google Gemini API (Required for Agent Q&A)
@@ -68,8 +68,8 @@ Create a file named `.env` inside the `frontend` folder: `CampusClimb/frontend/.
 VITE_API_URL=http://localhost:8000
 
 # Supabase Auth
-VITE_SUPABASE_URL=https://fzbfbmcbvbjpyruiibgc.supabase.co
-VITE_SUPABASE_ANON_KEY=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZ6YmZibWNidmJqcHlydWlpYmdjIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODg5NzcwMzQsImV4cCI6MjEwNDU1MzAzNH0.fVk1pwn4073kqCkxYgMfz395rlVn7XwfXwzcDk5oi0g
+VITE_SUPABASE_URL=https://your-project.supabase.co
+VITE_SUPABASE_ANON_KEY=your_supabase_anon_key_here
 ```
 
 ---
