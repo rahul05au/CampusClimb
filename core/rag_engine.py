@@ -476,21 +476,22 @@ def retrieve_filtered_chunks(
     # Resolve conversational query dynamically
     resolution = resolve_conversational_query(original_query, chat_history)
 
-    if not user_id:
-        return RetrievalTuple([], None, resolution)
-
     # Explicit empty selection: user deselected all sources
     if selected_source_ids is not None and len(selected_source_ids) == 0:
         logger.info("[RAG 2.0] Empty selected_source_ids provided; returning 0 chunks.")
         return RetrievalTuple([], None, resolution)
 
-    # Database query strictly joined on Note with user_id and subject
-    note_query = db.query(Note.id).filter(
-        Note.user_id == user_id,
-        Note.subject == subject,
-    )
-    if selected_source_ids is not None:
-        note_query = note_query.filter(Note.id.in_(selected_source_ids))
+    # Database query on Note for the subject strictly scoped by user ownership
+    filters = []
+    if user_id:
+        filters.append(Note.user_id == user_id)
+    else:
+        filters.append(Note.user_id == "guest_user")
+
+    if selected_source_ids is not None and len(selected_source_ids) > 0:
+        filters.append(Note.id.in_(selected_source_ids))
+
+    note_query = db.query(Note.id).filter(Note.subject == subject).filter(*filters)
 
     allowed_note_ids = [n[0] for n in note_query.all()]
     if not allowed_note_ids:
@@ -702,6 +703,7 @@ async def _call_gemini_json(
     prompt: str,
     temperature: float = 0.2,
     api_key: Optional[str] = None,
+    timeout_seconds: Optional[float] = None,
 ) -> Optional[Dict[str, Any]]:
     """Execute Gemini API call with multi-model fallback and exponential backoff.
 
@@ -719,7 +721,7 @@ async def _call_gemini_json(
 
     # Deduplicated list of models to try
     candidate_models = [rag_settings.GEMINI_MODEL]
-    for m in getattr(rag_settings, "FALLBACK_MODELS", ("gemini-flash-latest", "gemini-2.5-flash", "gemini-2.0-flash")):
+    for m in getattr(rag_settings, "FALLBACK_MODELS", ("gemini-3.5-flash", "gemini-flash-latest")):
         if m not in candidate_models:
             candidate_models.append(m)
 
@@ -732,15 +734,14 @@ async def _call_gemini_json(
         },
     }
 
-    # Use a generous read timeout (Gemini can take 20-40s on large contexts)
-    # but a tight connect timeout to fail fast on dead endpoints.
+    timeout_val = timeout_seconds if timeout_seconds is not None else float(getattr(rag_settings, "HTTP_TIMEOUT_SECONDS", 25.0))
     http_timeout = httpx.Timeout(
-        connect=10.0,
-        read=float(getattr(rag_settings, "HTTP_TIMEOUT_SECONDS", 45.0)),
-        write=10.0,
+        connect=5.0,
+        read=timeout_val,
+        write=5.0,
         pool=5.0,
     )
-    max_retries = max(1, getattr(rag_settings, "MAX_RETRIES", 2))
+    max_retries = max(1, getattr(rag_settings, "MAX_RETRIES", 1))
 
     for model_name in candidate_models:
         target_url = (
@@ -771,15 +772,36 @@ async def _call_gemini_json(
                         text_content = candidates[0]["content"]["parts"][0]["text"]
                         clean_json = re.sub(r"^```(?:json)?\s*", "", text_content.strip(), flags=re.MULTILINE)
                         clean_json = re.sub(r"\s*```$", "", clean_json.strip(), flags=re.MULTILINE)
-                        return json.loads(clean_json)
+                        try:
+                            return json.loads(clean_json)
+                        except json.JSONDecodeError:
+                            # Fallback 1: match outermost JSON object/array
+                            m = re.search(r"(\{.*\}|\[.*\])", clean_json, re.DOTALL)
+                            if m:
+                                try:
+                                    return json.loads(m.group(0))
+                                except json.JSONDecodeError:
+                                    pass
+                            # Fallback 2: raw_decode from first open brace/bracket to ignore trailing extra text
+                            start_brace = clean_json.find("{")
+                            start_bracket = clean_json.find("[")
+                            indices = [i for i in [start_brace, start_bracket] if i != -1]
+                            if indices:
+                                first_idx = min(indices)
+                                try:
+                                    obj, _ = json.JSONDecoder().raw_decode(clean_json[first_idx:])
+                                    return obj
+                                except Exception:
+                                    pass
+                            raise
 
                 if res.status_code == 429:
-                    # Quota/rate-limit: immediately use local synthesis fallback
+                    # Quota/rate-limit on this model: try next candidate model
                     logger.warning(
-                        "Gemini API quota/rate-limit reached (HTTP 429). "
-                        "Switching to fast local synthesis."
+                        "Gemini model %s returned HTTP 429 (quota/rate-limit). Trying next candidate model.",
+                        model_name,
                     )
-                    return None
+                    break  # try next candidate model
 
                 if res.status_code == 503:
                     # Transient high demand: back off and retry

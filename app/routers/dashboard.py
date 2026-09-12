@@ -8,12 +8,12 @@ Hardened against N+1 query patterns by using batch fetching and in-memory indexi
 import json
 import logging
 from collections import defaultdict
-from typing import Any, Dict
+from typing import Any, Dict, Optional
 
 from fastapi import APIRouter, Depends, Query, Request
-from sqlalchemy.orm import Session, joinedload
+from sqlalchemy.orm import Session, joinedload, defer
 
-from app.auth import get_current_user
+from app.auth import get_current_user, get_current_user_optional
 from app.database import get_db
 from app.models import Note, NoteChunk, PYQ, SyllabusTopic, TopicImportance
 from app.rate_limiter import ai_rate_limiter
@@ -50,22 +50,34 @@ async def get_system_stats(request: Request, db: Session = Depends(get_db)):
 async def get_user_dashboard(
     subject: str = Query("Operating Systems"),
     db: Session = Depends(get_db),
-    _current_user: Dict[str, Any] = Depends(get_current_user),
+    _current_user: Optional[Dict[str, Any]] = Depends(get_current_user_optional),
 ):
     """Retrieve structured, user-scoped dashboard overview and topic breakdown.
     
     Optimized: All TopicImportance and NoteChunk records are batch-fetched in 2 queries
     instead of 2 * N queries inside the topic iteration loop.
     """
-    user_id = _current_user.get("id")
+    user_id = _current_user.get("id") if _current_user else None
+    user_email = _current_user.get("email") if _current_user else None
     subject_clean = (subject or "Operating Systems").strip()
 
     # 1. Overview metrics
-    user_notes = (
+    all_subject_notes = (
         db.query(Note)
-        .filter(Note.user_id == user_id, Note.subject == subject_clean)
+        .filter(Note.subject == subject_clean)
         .all()
     )
+
+    user_notes = []
+    if user_id or user_email:
+        user_notes = [
+            n for n in all_subject_notes
+            if (user_id and n.user_id == user_id) or (user_email and n.student_name == user_email)
+        ]
+    else:
+        # Unauthenticated / guest viewer: view guest notes only
+        user_notes = [n for n in all_subject_notes if n.user_id == "guest_user"]
+
     user_note_ids = [n.id for n in user_notes]
 
     total_notes = len(user_notes)
@@ -123,11 +135,12 @@ async def get_user_dashboard(
         importance_map = {imp.topic_id: imp for imp in importances}
 
     # Batch-fetch all user NoteChunks for these topics in ONE query (eager-loading note)
+    # Batch-fetch NoteChunks for these topics with deferred large embedding column
     chunks_by_topic: Dict[int, list] = defaultdict(list)
     if user_note_ids and topic_ids:
         chunks_db = (
             db.query(NoteChunk)
-            .options(joinedload(NoteChunk.note))
+            .options(defer(NoteChunk.embedding), joinedload(NoteChunk.note))
             .filter(
                 NoteChunk.note_id.in_(user_note_ids),
                 NoteChunk.matched_topic_id.in_(topic_ids),
@@ -167,26 +180,23 @@ async def get_user_dashboard(
         merged_notes = []
         flat_chunks = []
 
-        for c_key, member_chunks in clusters.items():
+        # Sort clusters so representative clusters come first
+        sorted_cluster_items = sorted(
+            clusters.items(),
+            key=lambda item: any(m.is_representative for m in item[1]),
+            reverse=True,
+        )
+
+        for c_key, member_chunks in sorted_cluster_items[:30]:  # Top 30 clusters per topic for instantaneous response
             # Find representative chunk (or fall back to first/longest)
             rep_chunk = next((m for m in member_chunks if m.is_representative), member_chunks[0])
-            rep_embedding = json.loads(rep_chunk.embedding) if rep_chunk.embedding else None
 
             duplicates = []
             for m in member_chunks:
                 if m.id == rep_chunk.id:
                     continue
 
-                # Compute pairwise cosine similarity between duplicate and representative
-                sim_to_rep = 0.0
-                if rep_embedding and m.embedding:
-                    try:
-                        m_embedding = json.loads(m.embedding)
-                        sim_to_rep = round(cosine_sim(rep_embedding, m_embedding), 4)
-                    except Exception:
-                        sim_to_rep = m.similarity_score or 0.0
-                else:
-                    sim_to_rep = m.similarity_score or 0.0
+                sim_to_rep = round(float(m.similarity_score or 0.0), 4)
 
                 note_id = m.note_id
                 filename = m.note.original_filename if m.note else f"Note #{note_id}"

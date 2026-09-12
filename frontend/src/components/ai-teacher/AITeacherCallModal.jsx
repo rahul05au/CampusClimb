@@ -85,6 +85,8 @@ export default function AITeacherCallModal({
   token = null,
   initialHistory = [],
   onSyncHistory,
+  initialPrompt = '',
+  initialTopic = '',
 }) {
   // Call State Machine: 'CALLING' | 'CONNECTED' | 'LISTENING' | 'THINKING' | 'SPEAKING' | 'ERROR'
   const [callState, setCallState] = useState('CALLING');
@@ -295,8 +297,8 @@ export default function AITeacherCallModal({
       setInterimTranscript('');
       setErrorMessage('');
 
-      // Safety timeout on THINKING (18s) to prevent frozen UI if LLM times out
-      setSafetyTimeout('ERROR', 18000, 'The teacher is taking longer than expected. Tap to try again.');
+      // Safety timeout on THINKING (35s) to prevent frozen UI if connection drops
+      setSafetyTimeout('ERROR', 35000, 'The teacher is taking longer than expected. Tap to try again.');
 
       // Build chat history from past call turns (last 4 items)
       const chatHistoryPayload = callHistoryRef.current
@@ -306,6 +308,8 @@ export default function AITeacherCallModal({
           { role: 'assistant', content: h.data?.answer || '' },
         ])
         .flat();
+
+      const activeToken = token || (typeof window !== 'undefined' ? localStorage.getItem('campusclimb_token') : null);
 
       try {
         const res = await axios.post(
@@ -317,10 +321,11 @@ export default function AITeacherCallModal({
             selected_source_ids: selectedSourceIds,
             chat_history: chatHistoryPayload,
           },
-          { headers: token ? { Authorization: `Bearer ${token}` } : {} }
+          { headers: activeToken ? { Authorization: `Bearer ${activeToken}` } : {} }
         );
 
         clearSafetyTimeout();
+        setErrorMessage('');
         const data = res.data;
 
         // Grounding status
@@ -347,7 +352,7 @@ export default function AITeacherCallModal({
         clearSafetyTimeout();
         console.error('Teacher call query error:', err);
         setCallState('ERROR');
-        setErrorMessage('I could not reach the teacher right now. Tap the mic to try again.');
+        setErrorMessage('The teacher is taking longer than expected. Tap here to try again.');
       }
     },
     [
@@ -515,11 +520,17 @@ export default function AITeacherCallModal({
         if (!isMountedRef.current) return;
         setCallState('CONNECTED');
         setConnectedAt(Date.now());
-        // Transition to LISTENING immediately
-        setTimeout(() => {
-          if (!isMountedRef.current) return;
-          setCallState('LISTENING');
-        }, 500);
+        if (initialPrompt && initialPrompt.trim()) {
+          setTimeout(() => {
+            if (!isMountedRef.current) return;
+            executeQuery(initialPrompt.trim());
+          }, 400);
+        } else {
+          setTimeout(() => {
+            if (!isMountedRef.current) return;
+            setCallState('LISTENING');
+          }, 500);
+        }
       }, 1600);
 
       return () => clearTimeout(callingTimer);
@@ -580,6 +591,13 @@ export default function AITeacherCallModal({
    * Toggle Mic / Mute
    */
   const handleToggleMute = () => {
+    if (callState === 'ERROR') {
+      setErrorMessage('');
+      setCallState('LISTENING');
+      setIsMuted(false);
+      setTimeout(() => startListening(), 100);
+      return;
+    }
     if (isMuted) {
       setIsMuted(false);
       if (callState === 'LISTENING') {
@@ -619,6 +637,17 @@ export default function AITeacherCallModal({
     },
     [callState, stopAudioPlayback, clearSafetyTimeout, executeQuery]
   );
+
+  useEffect(() => {
+    if (!isOpen) return;
+    const handleKeyDown = (e) => {
+      if (e.key === 'Escape') {
+        handleEndCall();
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [isOpen]);
 
   if (!isOpen) return null;
 
@@ -694,14 +723,26 @@ export default function AITeacherCallModal({
 
           {/* Error Notice */}
           {errorMessage && (
-            <motion.div
+            <motion.button
+              type="button"
+              onClick={() => {
+                const queryToRetry = transcript;
+                setErrorMessage('');
+                if (queryToRetry && queryToRetry.trim()) {
+                  executeQuery(queryToRetry.trim());
+                } else {
+                  setCallState('LISTENING');
+                  setTimeout(() => startListening(), 100);
+                }
+              }}
               initial={{ opacity: 0, y: 6 }}
               animate={{ opacity: 1, y: 0 }}
-              className="mt-3 flex items-center gap-2 px-4 py-2 rounded-lg bg-red-500/10 border border-red-500/30 text-xs text-red-300 font-sans"
+              className="mt-3 flex items-center gap-2 px-4 py-2 rounded-lg bg-red-500/10 hover:bg-red-500/20 border border-red-500/30 text-xs text-red-300 font-sans cursor-pointer transition-colors"
+              title="Tap to retry"
             >
               <AlertTriangle className="w-4 h-4 shrink-0 text-red-400" />
               <span>{errorMessage}</span>
-            </motion.div>
+            </motion.button>
           )}
         </div>
 

@@ -209,6 +209,16 @@ class SourceChunkSchema(BaseModel):
     similarity_score: Optional[float] = None
 
 
+class SyllabusAlignment(BaseModel):
+    is_aligned: bool
+    status: str = "in_syllabus"  # "in_syllabus" | "out_of_syllabus"
+    unit_number: Optional[int] = None
+    unit_name: Optional[str] = None
+    matched_topic: Optional[str] = None
+    confidence: float = 0.0
+    reason: Optional[str] = None
+
+
 class AgentQueryResponse(BaseModel):
     query: str
     subject: str
@@ -227,4 +237,219 @@ class AgentQueryResponse(BaseModel):
     citations: List[CitationItem] = Field(default_factory=list)
     diagram_mermaid: Optional[str] = None
     related_questions: List[str] = Field(default_factory=list)
+    syllabus_alignment: Optional[SyllabusAlignment] = None
+
+
+# --- Study & Academic Intelligence Engine Schemas ---
+class TopicProgressSummary(BaseModel):
+    id: Optional[int] = None
+    topic_id: int
+    topic_name: str
+    unit_number: int
+    unit_name: str
+    revision_completed: bool = False
+    flashcards_completed: bool = False
+    quizzes_taken: int = 0
+    last_quiz_score: Optional[float] = None
+    mastery_score: float = 0.0
+    importance_score: float = 0.0
+    importance_label: str = "Low"
+    question_count: int = 0
+
+
+class NextBestAction(BaseModel):
+    topic_id: int
+    topic_name: str
+    unit_number: int
+    unit_name: str
+    action_type: str  # "revision" | "quiz" | "flashcards"
+    action_label: str
+    duration_minutes: int
+    urgency_score: float
+    pyq_count: int
+    mastery_score: float
+    reason: str
+    why_topic: Dict[str, Any] = Field(default_factory=dict)
+
+
+class ExamReadinessBreakdown(BaseModel):
+    overall_score: float
+    pyq_coverage: float
+    topic_mastery: float
+    quiz_accuracy: float
+    revision_rate: float
+    weakest_topic: Optional[str] = None
+    highest_value_improvement: str
+
+
+class StudyOverviewResponse(BaseModel):
+    subject_id: int
+    subject_name: str
+    exam_readiness: ExamReadinessBreakdown
+    next_best_action: Optional[NextBestAction] = None
+    topics: List[TopicProgressSummary] = Field(default_factory=list)
+    active_plan: Optional[Dict[str, Any]] = None
+
+
+class HighYieldRevisionRequest(BaseModel):
+    subject_id: Optional[int] = None
+    subject_name: Optional[str] = None
+    topic_id: Optional[int] = None
+    topic_name: Optional[str] = None
+
+
+class HighYieldRevisionResponse(BaseModel):
+    topic_id: int
+    topic_name: str
+    unit_number: int
+    unit_name: str
+    must_know: List[str]
+    remember: List[str]
+    exam_angle: str
+    common_trap: str
+    quick_recall: str
+    diagram_mermaid: Optional[str] = None
+
+
+class FlashcardItem(BaseModel):
+    id: int
+    question: str
+    answer: str
+    key_takeaway: str
+    exam_angle: Optional[str] = None
+    common_trap: Optional[str] = None
+
+
+class FlashcardRating(BaseModel):
+    card_id: int
+    rating: str = Field(..., pattern=r"^(Again|Hard|Good|Easy)$")
+
+
+class FlashcardsRequest(BaseModel):
+    subject_id: Optional[int] = None
+    subject_name: Optional[str] = None
+    topic_id: Optional[int] = None
+    topic_name: Optional[str] = None
+
+
+class FlashcardsCompleteRequest(BaseModel):
+    subject_id: Optional[int] = None
+    subject_name: Optional[str] = None
+    topic_id: Optional[int] = None
+    topic_name: Optional[str] = None
+    ratings: Optional[List[FlashcardRating]] = None
+
+
+class FlashcardsResponse(BaseModel):
+    topic_id: int
+    topic_name: str
+    cards: List[FlashcardItem] = Field(default_factory=list)
+
+
+class QuizQuestion(BaseModel):
+    id: int
+    question: str
+    options: List[str]
+    correct_index: Optional[int] = None  # None when sent to student, evaluated server-side
+    explanation: Optional[str] = None
+    exam_tip: Optional[str] = None
+    topic_tag: Optional[str] = None
+
+
+class QuizRequest(BaseModel):
+    subject_id: Optional[int] = None
+    subject_name: Optional[str] = None
+    topic_id: Optional[int] = None
+    topic_name: Optional[str] = None
+
+
+class QuizResponse(BaseModel):
+    topic_id: int
+    topic_name: str
+    quiz_id: str
+    questions: List[QuizQuestion] = Field(default_factory=list)
+
+
+class QuizAnswerItem(BaseModel):
+    question_id: int
+    selected_index: int
+
+
+class QuizSubmitRequest(BaseModel):
+    subject_id: Optional[int] = None
+    subject_name: Optional[str] = None
+    topic_id: Optional[int] = None
+    topic_name: Optional[str] = None
+    quiz_id: str
+    answers: List[QuizAnswerItem]
+
+
+class QuizSubmitResponse(BaseModel):
+    topic_id: int
+    score_percentage: float
+    total_questions: int
+    correct_count: int
+    mastery_score: float
+    improvement_delta: float
+    weak_concepts: List[str] = Field(default_factory=list)
+    question_breakdown: List[Dict[str, Any]] = Field(default_factory=list)
+
+
+class StudyPlanRequest(BaseModel):
+    subject_id: Optional[int] = None
+    subject_name: Optional[str] = None
+    exam_date: Optional[str] = None  # ISO format string or YYYY-MM-DD
+    daily_hours: float = Field(2.0, ge=0.5, le=16.0)
+    mode: str = Field("Sprint", pattern=r"^(Emergency|Sprint|Mastery)$")
+
+
+class StudyPlanResponse(BaseModel):
+    plan_id: int
+    subject_id: int
+    exam_date: Optional[str] = None
+    daily_hours: float
+    mode: str
+    total_scheduled_minutes: int
+    total_topics_covered: int
+    tasks: List[Dict[str, Any]] = Field(default_factory=list)
+
+
+class MockExamRequest(BaseModel):
+    subject_id: Optional[int] = None
+    subject_name: Optional[str] = None
+    mode: str = Field("standard", pattern=r"^(standard|quick)$")
+
+
+class MockExamResponse(BaseModel):
+    exam_id: str
+    subject: str
+    university_pattern: str
+    total_marks: int
+    duration_minutes: int
+    instructions: List[str]
+    part_a: List[Dict[str, Any]] = Field(default_factory=list)
+    part_b: List[Dict[str, Any]] = Field(default_factory=list)
+
+
+class MockExamAnswerItem(BaseModel):
+    question_number: int
+    part: str  # "A" or "B"
+    student_answer: str
+
+
+class MockExamSubmitRequest(BaseModel):
+    subject_id: Optional[int] = None
+    subject_name: Optional[str] = None
+    exam_id: str
+    answers: List[MockExamAnswerItem]
+
+
+class MockExamSubmitResponse(BaseModel):
+    exam_id: str
+    total_score: float
+    max_marks: int
+    percentage: float
+    overall_feedback: str
+    evaluations: List[Dict[str, Any]] = Field(default_factory=list)
+
 

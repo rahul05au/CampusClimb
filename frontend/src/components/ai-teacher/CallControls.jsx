@@ -159,6 +159,8 @@ export default function CallControls({
           ? 'Teacher is analyzing notes...'
           : callState === 'SPEAKING'
           ? 'Teacher is speaking — tap Interrupt to jump in'
+          : callState === 'ERROR'
+          ? 'Tap error banner or mic to try again'
           : 'Ready'}
       </p>
     </div>

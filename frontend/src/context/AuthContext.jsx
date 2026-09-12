@@ -11,6 +11,7 @@ function clearUserSpecificStorage() {
     if (!key) continue;
     if (
       key === 'campusclimb_user' ||
+      key === 'campusclimb_token' ||
       key.startsWith('campusclimb_sources_') ||
       key.startsWith('campusclimb_dashboard_') ||
       key.startsWith('campusclimb_query_') ||
@@ -23,9 +24,14 @@ function clearUserSpecificStorage() {
 }
 
 export function AuthProvider({ children }) {
-  // In-memory token state — avoids redundant XSS-accessible localStorage copy.
-  // The Supabase SDK manages its own session storage securely.
-  const [token, setToken] = useState(null);
+  // Synchronously initialize token from localStorage to prevent auth race conditions
+  const [token, setToken] = useState(() => {
+    try {
+      return localStorage.getItem('campusclimb_token') || null;
+    } catch {
+      return null;
+    }
+  });
   const [user, setUser]   = useState(() => {
     try {
       const saved = localStorage.getItem('campusclimb_user');
@@ -51,6 +57,7 @@ export function AuthProvider({ children }) {
             };
             setToken(session.access_token);
             setUser(uData);
+            localStorage.setItem('campusclimb_token', session.access_token);
             localStorage.setItem('campusclimb_user', JSON.stringify(uData));
           }
         } catch (err) {
@@ -64,7 +71,7 @@ export function AuthProvider({ children }) {
 
     let authListener = null;
     if (isSupabaseConfigured && supabase) {
-      const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+      const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
         if (!mounted) return;
         if (session) {
           const uData = {
@@ -74,10 +81,12 @@ export function AuthProvider({ children }) {
           };
           setToken(session.access_token);
           setUser(uData);
+          localStorage.setItem('campusclimb_token', session.access_token);
           localStorage.setItem('campusclimb_user', JSON.stringify(uData));
-        } else {
+        } else if (event === 'SIGNED_OUT') {
           setToken(null);
           setUser(null);
+          localStorage.removeItem('campusclimb_token');
           localStorage.removeItem('campusclimb_user');
           clearUserSpecificStorage();
         }
@@ -96,9 +105,13 @@ export function AuthProvider({ children }) {
     clearUserSpecificStorage();
     setToken(accessToken);
     setUser(userData);
+    if (accessToken) {
+      localStorage.setItem('campusclimb_token', accessToken);
+    }
     if (userData) {
       localStorage.setItem('campusclimb_user', JSON.stringify(userData));
     }
+    setLoading(false);
     if (isSupabaseConfigured && supabase && accessToken && refreshToken) {
       try {
         await supabase.auth.setSession({
@@ -118,6 +131,7 @@ export function AuthProvider({ children }) {
         if (session?.access_token) {
           if (session.access_token !== token) {
             setToken(session.access_token);
+            localStorage.setItem('campusclimb_token', session.access_token);
           }
           return session.access_token;
         }
@@ -125,12 +139,13 @@ export function AuthProvider({ children }) {
         console.warn('[AuthContext] getToken error:', err);
       }
     }
-    return token;
+    return token || localStorage.getItem('campusclimb_token');
   };
 
   const logout = () => {
     setToken(null);
     setUser(null);
+    localStorage.removeItem('campusclimb_token');
     localStorage.removeItem('campusclimb_user');
     clearUserSpecificStorage();
     if (isSupabaseConfigured && supabase) {

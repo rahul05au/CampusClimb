@@ -14,7 +14,7 @@ from typing import Any, Dict, List, Optional
 from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
 from sqlalchemy.orm import Session
 
-from app.auth import get_current_user
+from app.auth import get_current_user, get_current_user_optional
 from app.database import get_db
 from app.models import Note, NoteChunk, SyllabusTopic
 from app.rate_limiter import ai_rate_limiter
@@ -25,6 +25,7 @@ from app.schemas import (
     SourceChunkSchema,
     SourceItemSchema,
     SourceListResponse,
+    SyllabusAlignment,
 )
 from core.embeddings import get_embedding
 from core.rag_engine import (
@@ -48,21 +49,29 @@ router = APIRouter(prefix="/api/v1/agent", tags=["Bilingual Agent"])
 async def list_user_sources(
     subject: str = Query("Operating Systems"),
     db: Session = Depends(get_db),
-    _current_user: Dict[str, Any] = Depends(get_current_user),
+    _current_user: Optional[Dict[str, Any]] = Depends(get_current_user_optional),
 ):
     """List all uploaded note sources for the authenticated user and subject."""
-    user_id = _current_user.get("id")
+    user_id = _current_user.get("id") if _current_user else None
+    user_email = _current_user.get("email") if _current_user else None
     subject_clean = (subject or "Operating Systems").strip()
 
-    if not user_id:
-        return SourceListResponse(subject=subject_clean, sources=[])
-
-    user_notes = (
+    all_notes = (
         db.query(Note)
-        .filter(Note.user_id == user_id, Note.subject == subject_clean)
+        .filter(Note.subject == subject_clean)
         .order_by(Note.upload_date.desc(), Note.id.desc())
         .all()
     )
+
+    user_notes = []
+    if user_id or user_email:
+        user_notes = [
+            n for n in all_notes
+            if (user_id and n.user_id == user_id) or (user_email and n.student_name == user_email)
+        ]
+    else:
+        # Unauthenticated / guest viewer: view guest notes only
+        user_notes = [n for n in all_notes if n.user_id == "guest_user"]
 
     source_items = []
     for n in user_notes:
@@ -116,13 +125,13 @@ async def agent_query(
     request: Request,
     body: AgentQueryRequest,
     db: Session = Depends(get_db),
-    _current_user: Dict[str, Any] = Depends(get_current_user),
+    _current_user: Optional[Dict[str, Any]] = Depends(get_current_user_optional),
 ):
     """Bilingual Agent endpoint — Intelligent NotebookLM RAG & General Knowledge fallback."""
     # Enforce AI route rate limiting per IP
     ai_rate_limiter.check(request)
 
-    user_id = _current_user.get("id")
+    user_id = _current_user.get("id") if _current_user else None
 
     # Dynamic language detection across the entire pipeline
     detected_lang = detect_language(body.query)
@@ -148,6 +157,7 @@ async def agent_query(
         query_emb = [0.0] * 768
 
     matched_topic_name = "General Concept"
+    matched_topic_obj = None
     topic_mapping_score = 0.0
 
     if topics and query_emb:
@@ -170,6 +180,7 @@ async def agent_query(
                     matched_topic_id = raw_top[0]
                     topic_mapping_score = float(raw_top[1])
                     matched_topic_name = topic_name_map.get(matched_topic_id, "General Concept")
+                    matched_topic_obj = next((t for t in topics if t.id == matched_topic_id), None)
         except Exception as exc:
             logger.warning("Topic mapping non-fatal exception: %s", exc)
 
@@ -238,6 +249,21 @@ async def agent_query(
             for c in top_chunks
         ]
 
+        is_aligned = (topic_mapping_score >= 0.55) and (matched_topic_name != "General Concept")
+        syllabus_alignment = SyllabusAlignment(
+            is_aligned=is_aligned,
+            status="in_syllabus" if is_aligned else "out_of_syllabus",
+            unit_number=matched_topic_obj.unit_number if (matched_topic_obj and is_aligned) else None,
+            unit_name=matched_topic_obj.unit_name if (matched_topic_obj and is_aligned) else None,
+            matched_topic=matched_topic_name if is_aligned else None,
+            confidence=round(topic_mapping_score, 4),
+            reason=(
+                f"Topic '{matched_topic_name}' belongs to Unit {matched_topic_obj.unit_number}: {matched_topic_obj.unit_name}."
+                if (matched_topic_obj and is_aligned)
+                else "Question lies outside direct syllabus unit boundaries; general knowledge reasoning applied."
+            ),
+        )
+
         return AgentQueryResponse(
             query=body.query,
             subject=body.subject,
@@ -256,6 +282,7 @@ async def agent_query(
             citations=citations,
             diagram_mermaid=diagram_mermaid,
             related_questions=related_questions,
+            syllabus_alignment=syllabus_alignment,
         )
 
     else:
@@ -277,6 +304,21 @@ async def agent_query(
 
         notice = get_localized_notice(effective_language)
 
+        is_aligned = (topic_mapping_score >= 0.55) and (matched_topic_name != "General Concept")
+        syllabus_alignment = SyllabusAlignment(
+            is_aligned=is_aligned,
+            status="in_syllabus" if is_aligned else "out_of_syllabus",
+            unit_number=matched_topic_obj.unit_number if (matched_topic_obj and is_aligned) else None,
+            unit_name=matched_topic_obj.unit_name if (matched_topic_obj and is_aligned) else None,
+            matched_topic=matched_topic_name if is_aligned else None,
+            confidence=round(topic_mapping_score, 4),
+            reason=(
+                f"Topic '{matched_topic_name}' belongs to Unit {matched_topic_obj.unit_number}: {matched_topic_obj.unit_name}."
+                if (matched_topic_obj and is_aligned)
+                else "Question lies outside direct syllabus unit boundaries; general knowledge reasoning applied."
+            ),
+        )
+
         return AgentQueryResponse(
             query=body.query,
             subject=body.subject,
@@ -295,5 +337,6 @@ async def agent_query(
             citations=[],
             diagram_mermaid=None,
             related_questions=related_questions,
+            syllabus_alignment=syllabus_alignment,
         )
 

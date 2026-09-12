@@ -12,7 +12,6 @@ import { Lightbulb, Sparkles, Globe, HelpCircle } from 'lucide-react';
  */
 export default function CallQuickActions({
   onSelectAction,
-  callState = 'LISTENING',
   matchedTopic = '',
   disabled = false,
   sttLanguage = 'auto',

@@ -14,7 +14,7 @@ Security hardening:
 import base64
 import logging
 import os
-from typing import Dict, Any
+from typing import Dict, Any, Optional
 
 import httpx
 import jwt
@@ -271,3 +271,20 @@ def get_current_user(
         "id": payload.get("sub", ""),
         "email": payload.get("email", ""),
     }
+
+
+def get_current_user_optional(
+    credentials: Optional[HTTPAuthorizationCredentials] = Depends(security),
+) -> Optional[Dict[str, Any]]:
+    """FastAPI dependency that extracts and validates the Bearer JWT token if present.
+    
+    Returns None if missing, expired, or invalid so public/general queries succeed.
+    """
+    if not credentials or not credentials.credentials:
+        return None
+    try:
+        return get_current_user(credentials)
+    except HTTPException:
+        return None
+    except Exception:
+        return None

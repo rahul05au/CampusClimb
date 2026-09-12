@@ -29,6 +29,11 @@ from typing import Optional
 
 import pdfplumber
 
+try:
+    import pypdfium2 as pdfium
+except ImportError:
+    pdfium = None
+
 from config import SENTENCES_PER_CHUNK, MIN_CHUNK_WORDS
 
 logger = logging.getLogger(__name__)
@@ -322,10 +327,10 @@ def _extract_pages_with_positions(filepath: str) -> list[dict]:
     """
     Extract text and position data from each PDF page.
 
-    Directly inspects the non-empty lines of extract_text() for the top 3 lines
-    (running header zone) and bottom 3 lines (running footer zone). This ensures
-    100% string alignment with the text being cleaned, while eliminating the
-    performance overhead of word-coordinate extraction.
+    Uses high-speed native C++ extraction via pypdfium2 (Chromium engine) for sub-second
+    processing of text PDFs, with automatic per-page OCR fallback when a page contains
+    no extractable text (e.g. scanned image pages). Falls back to pdfplumber if pypdfium2
+    is unavailable.
 
     Returns a list of dicts, one per page:
         {
@@ -335,6 +340,50 @@ def _extract_pages_with_positions(filepath: str) -> list[dict]:
         }
     """
     pages = []
+    
+    # Strategy 1: High-performance pypdfium2 extraction
+    if pdfium is not None:
+        pdf = None
+        try:
+            pdf = pdfium.PdfDocument(filepath)
+            total_pages = len(pdf)
+            for idx in range(total_pages):
+                page = pdf[idx]
+                textpage = page.get_textpage()
+                page_text = textpage.get_text_range() or ""
+
+                # Page-level OCR fallback if page has negligible native text (e.g. scanned page)
+                if len(page_text.strip()) < 30:
+                    try:
+                        import pytesseract
+                        pil_img = page.render(scale=2.0).to_pil()
+                        ocr_result = pytesseract.image_to_string(pil_img)
+                        if len(ocr_result.strip()) > len(page_text.strip()):
+                            page_text = ocr_result
+                            logger.info("[PDFExtractor] Applied OCR fallback for scanned page %d/%d", idx + 1, total_pages)
+                    except Exception as ocr_err:
+                        logger.debug("[PDFExtractor] OCR fallback skipped for page %d: %s", idx + 1, ocr_err)
+
+                lines = [l.strip() for l in page_text.splitlines() if l.strip()]
+                top_lines = lines[:3] if len(lines) >= 1 else []
+                bottom_lines = lines[-3:] if len(lines) >= 4 else []
+                pages.append({
+                    "text": page_text,
+                    "top_lines": top_lines,
+                    "bottom_lines": bottom_lines,
+                })
+            return pages
+        except Exception as p_err:
+            logger.warning("[PDFExtractor] pypdfium2 extraction encountered error (%s); falling back to pdfplumber", p_err)
+            pages.clear()
+        finally:
+            if pdf is not None:
+                try:
+                    pdf.close()
+                except Exception:
+                    pass
+
+    # Strategy 2: Fallback to pdfplumber
     try:
         with pdfplumber.open(filepath) as pdf:
             for page in pdf.pages:
@@ -796,11 +845,43 @@ def chunk_text(text: str, sentences_per_chunk: Optional[int] = None) -> list[str
         return []
 
     chunks: list[str] = []
+    max_chunk_words = 220  # Safeguards token length to stay strictly within 384 max_seq_length
+
     for i in range(0, len(sentences), sentences_per_chunk):
-        chunk = " ".join(sentences[i : i + sentences_per_chunk])
-        word_count = len(chunk.split())
-        if word_count >= MIN_CHUNK_WORDS:
-            chunks.append(chunk)
+        chunk_sentences = sentences[i : i + sentences_per_chunk]
+        full_chunk = " ".join(chunk_sentences)
+        words = full_chunk.split()
+
+        if len(words) <= max_chunk_words:
+            if len(words) >= MIN_CHUNK_WORDS:
+                chunks.append(full_chunk)
+        else:
+            # Sub-divide oversized chunk so tokens never exceed model max_seq_length (384)
+            cur_words = []
+            for s in chunk_sentences:
+                s_words = s.split()
+                if len(s_words) > max_chunk_words:
+                    sub_parts = s.split("\n")
+                    for sp in sub_parts:
+                        sp_words = sp.split()
+                        if not sp_words:
+                            continue
+                        if len(cur_words) + len(sp_words) > max_chunk_words and len(cur_words) >= MIN_CHUNK_WORDS:
+                            chunks.append(" ".join(cur_words))
+                            cur_words = list(sp_words)
+                        else:
+                            cur_words.extend(sp_words)
+                elif len(cur_words) + len(s_words) > max_chunk_words and len(cur_words) >= MIN_CHUNK_WORDS:
+                    chunks.append(" ".join(cur_words))
+                    cur_words = list(s_words)
+                else:
+                    cur_words.extend(s_words)
+            if len(cur_words) >= MIN_CHUNK_WORDS:
+                chunks.append(" ".join(cur_words))
+            elif cur_words and chunks:
+                chunks[-1] = chunks[-1] + " " + " ".join(cur_words)
+            elif cur_words:
+                chunks.append(" ".join(cur_words))
 
     logger.debug(
         "[PDFExtractor] Chunked %d sentences → %d chunks (min_words=%d)",

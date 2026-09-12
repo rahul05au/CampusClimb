@@ -10,13 +10,14 @@ detail and context).
 
 Algorithm:
     1. Group chunks by matched_topic_id (only compare within same topic)
-    2. For each topic group, compute pairwise cosine similarity
+    2. For each topic group, compute vectorized pairwise cosine similarity
     3. If similarity > threshold, union the two chunks
     4. Extract connected components as dedup clusters
     5. Mark the longest chunk in each cluster as representative
 """
 
 from collections import defaultdict
+import numpy as np
 
 from core.embeddings import cosine_sim
 from config import DEDUP_SIMILARITY_THRESHOLD
@@ -94,14 +95,29 @@ def deduplicate_chunks(
     for chunk in chunks:
         uf.find(chunk["id"])
 
-    # Pairwise comparison within each topic group
+    # Vectorized pairwise comparison within each topic group
     for topic_id, group in topic_groups.items():
         n = len(group)
-        for i in range(n):
-            for j in range(i + 1, n):
-                sim = cosine_sim(group[i]["embedding"], group[j]["embedding"])
-                if sim > threshold:
-                    uf.union(group[i]["id"], group[j]["id"])
+        if n < 2:
+            continue
+        try:
+            embeddings_arr = np.asarray([g["embedding"] for g in group], dtype=np.float32)
+            norms = np.linalg.norm(embeddings_arr, axis=1, keepdims=True)
+            norms[norms == 0] = 1.0
+            normed = embeddings_arr / norms
+            sim_matrix = np.dot(normed, normed.T)
+
+            # Extract pairs exceeding threshold in upper triangle (i < j)
+            pairs = np.argwhere(np.triu(sim_matrix > threshold, k=1))
+            for i, j in pairs:
+                uf.union(group[i]["id"], group[j]["id"])
+        except Exception:
+            # Fallback to scalar comparison if numpy array conversion fails
+            for i in range(n):
+                for j in range(i + 1, n):
+                    sim = cosine_sim(group[i]["embedding"], group[j]["embedding"])
+                    if sim > threshold:
+                        uf.union(group[i]["id"], group[j]["id"])
 
     # Build clusters from union-find roots
     clusters = defaultdict(list)

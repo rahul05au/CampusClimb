@@ -1,10 +1,25 @@
+@import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap');
 @import "tailwindcss";
 @source "./**/*.{js,jsx,ts,tsx,html}";
 
 :root {
-  /* Option C: Research-Lab Terminal Palette (Zero Blue Slop) */
-  --font-sans: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, sans-serif;
-  --font-mono: 'JetBrains Mono', monospace;
+  --font-sans: 'Plus Jakarta Sans', ui-sans-serif, system-ui, sans-serif;
+  --font-mono: 'JetBrains Mono', ui-monospace, monospace;
+  --background: #f5f5f5;
+  --surface: #ffffff;
+  --surface-elevated: #fafafa;
+  --surface-hover: #f0f0f0;
+  --border: #e5e5e5;
+  --border-subtle: #eeeeee;
+  --text-primary: #18181b;
+  --text-secondary: #52525b;
+  --text-muted: #71717a;
+  --accent: #0f766e;
+  --accent-hover: #115e59;
+  --success: #15803d;
+  --warning: #b45309;
+  --error: #b91c1c;
+  --info: #0f766e;
 
   /* Spacing Scale */
   --space-xs: 4px;
@@ -25,6 +40,21 @@
 }
 
 .dark {
+  --background: #0a0a0a;
+  --surface: #141414;
+  --surface-elevated: #1a1a1a;
+  --surface-hover: #202020;
+  --border: #2a2a2a;
+  --border-subtle: #202020;
+  --text-primary: #f4f4f5;
+  --text-secondary: #a1a1aa;
+  --text-muted: #737373;
+  --accent: #2dd4bf;
+  --accent-hover: #5eead4;
+  --success: #4ade80;
+  --warning: #fbbf24;
+  --error: #fb7185;
+  --info: #5eead4;
   /* Dark Mode (True Black #0a0a0a, Zero Navy Tint) */
   --bg-page: #0a0a0a;
   --bg-card: #141414;
@@ -44,6 +74,7 @@ body {
   color: var(--text-main);
   overflow-x: hidden;
   -webkit-font-smoothing: antialiased;
+  line-height: 1.5;
   transition: background-color 0.2s ease, color 0.2s ease;
 }
 
@@ -75,11 +106,9 @@ input:-webkit-autofill:active {
 }
 
 .glass-card {
-  background: var(--bg-card);
-  backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
-  border: 1px solid var(--border-color);
-  border-top: 1px solid rgba(255, 255, 255, 0.1);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  box-shadow: 0 1px 0 rgba(255, 255, 255, 0.035);
 }
 
 .glass-card-hover {
@@ -87,8 +116,9 @@ input:-webkit-autofill:active {
 }
 
 .glass-card-hover:hover {
-  border-color: var(--accent-signal);
-  box-shadow: 0 8px 24px -8px rgba(20, 184, 166, 0.15);
+  border-color: color-mix(in srgb, var(--accent) 45%, var(--border));
+  background: var(--surface-elevated);
+  transform: translateY(-1px);
 }
 
 /* Input Well Inset Shadow */
@@ -116,4 +146,46 @@ input:-webkit-autofill:active {
   background-image: 
     linear-gradient(to right, rgba(255, 255, 255, 0.04) 1px, transparent 1px),
     linear-gradient(to bottom, rgba(255, 255, 255, 0.04) 1px, transparent 1px);
+}
+
+:where(button, a, input, select, textarea):focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 3px;
+}
+
+.mobile-nav { display: none; }
+
+@media (max-width: 767px) {
+  .mobile-nav {
+    position: fixed;
+    z-index: 60;
+    inset: auto 0 0;
+    display: grid;
+    grid-template-columns: repeat(5, 1fr);
+    min-height: calc(64px + env(safe-area-inset-bottom));
+    padding: 7px 8px calc(7px + env(safe-area-inset-bottom));
+    background: color-mix(in srgb, var(--background) 94%, transparent);
+    border-top: 1px solid var(--border);
+    backdrop-filter: blur(16px);
+  }
+  .mobile-nav__item {
+    min-height: 44px;
+    display: grid;
+    place-items: center;
+    align-content: center;
+    gap: 3px;
+    color: var(--text-muted);
+    font-size: 10px;
+    font-weight: 600;
+    text-decoration: none;
+  }
+  .mobile-nav__item svg { width: 19px; height: 19px; }
+  .mobile-nav__item.is-active { color: var(--accent); }
+  .mobile-nav__item.is-active svg { stroke-width: 2.5px; }
+  .app-workspace main { padding-bottom: calc(88px + env(safe-area-inset-bottom)) !important; }
+  .mobile-hide { display: none !important; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation-duration: 0.01ms !important; animation-iteration-count: 1 !important; transition-duration: 0.01ms !important; scroll-behavior: auto !important; }
 }

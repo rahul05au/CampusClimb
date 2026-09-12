@@ -41,9 +41,11 @@ GEMINI_MODEL = os.getenv("GEMINI_MODEL", "gemini-3.5-flash")
 GEMINI_URL_BASE = (
     f"https://generativelanguage.googleapis.com/v1beta/models/{GEMINI_MODEL}:generateContent"
 )
-GEMINI_TIMEOUT_SECONDS = 30.0
-GEMINI_MAX_RETRIES = 2          # retries on 429 / 503
-GEMINI_RETRY_BASE_SECONDS = 2.0 # exponential backoff base
+GEMINI_TIMEOUT_SECONDS = 3.0
+GEMINI_MAX_RETRIES = 0          # fail fast to local cleaning on 429 / timeout
+GEMINI_RETRY_BASE_SECONDS = 1.0
+
+_CIRCUIT_BREAKER_UNTIL = 0.0
 
 # If cleaned output is less than this fraction of input word count, treat as
 # over-cleaned and fall back to local result.
@@ -357,11 +359,14 @@ def _validate_cleaned_output(
 
 def _call_gemini(prompt: str, api_key: str) -> Optional[dict]:
     """
-    Call Gemini API with exponential backoff on 429 / 503.
-
+    Call Gemini API with fail-fast fallback to local cleaning on 429 / 503 / timeout.
     Returns parsed JSON dict from Gemini, or None on failure.
     Never raises — all exceptions are caught and logged.
     """
+    global _CIRCUIT_BREAKER_UNTIL
+    if time.time() < _CIRCUIT_BREAKER_UNTIL:
+        return None
+
     url = f"{GEMINI_URL_BASE}?key={api_key}"
     payload = {
         "contents": [{"parts": [{"text": prompt}]}],
@@ -372,80 +377,53 @@ def _call_gemini(prompt: str, api_key: str) -> Optional[dict]:
         },
     }
 
-    for attempt in range(GEMINI_MAX_RETRIES + 1):
-        try:
-            with httpx.Client(timeout=GEMINI_TIMEOUT_SECONDS) as client:
-                resp = client.post(url, json=payload)
+    try:
+        with httpx.Client(timeout=GEMINI_TIMEOUT_SECONDS) as client:
+            resp = client.post(url, json=payload)
 
-            if resp.status_code == 200:
-                data = resp.json()
-                candidates = data.get("candidates", [])
-                if candidates:
-                    parts = candidates[0].get("content", {}).get("parts", [])
-                    if parts and "text" in parts[0]:
-                        raw_json_str = parts[0]["text"].strip()
-                        if raw_json_str.startswith("```"):
-                            raw_json_str = re.sub(r"^```(?:json)?\s*", "", raw_json_str)
-                            raw_json_str = re.sub(r"\s*```$", "", raw_json_str).strip()
-                        try:
-                            return json.loads(raw_json_str)
-                        except json.JSONDecodeError:
-                            logger.warning(
-                                "[NoteFormatter] Gemini JSON parse failure (attempt %d): %s",
-                                attempt + 1,
-                                raw_json_str[:200],
-                            )
-                            return None
+        if resp.status_code == 200:
+            data = resp.json()
+            candidates = data.get("candidates", [])
+            if candidates:
+                parts = candidates[0].get("content", {}).get("parts", [])
+                if parts and "text" in parts[0]:
+                    raw_json_str = parts[0]["text"].strip()
+                    if raw_json_str.startswith("```"):
+                        raw_json_str = re.sub(r"^```(?:json)?\s*", "", raw_json_str)
+                        raw_json_str = re.sub(r"\s*```$", "", raw_json_str).strip()
+                    try:
+                        return json.loads(raw_json_str)
+                    except json.JSONDecodeError:
+                        logger.warning(
+                            "[NoteFormatter] Gemini JSON parse failure: %s",
+                            raw_json_str[:200],
+                        )
+                        return None
+            return None
 
-                logger.warning(
-                    "[NoteFormatter] Gemini empty candidates (attempt %d): %s",
-                    attempt + 1,
-                    resp.text[:200],
-                )
-                return None
-
-            elif resp.status_code in (429, 503):
-                if attempt < GEMINI_MAX_RETRIES:
-                    wait = GEMINI_RETRY_BASE_SECONDS * (2 ** attempt)
-                    logger.warning(
-                        "[NoteFormatter] Gemini %d (attempt %d/%d); retrying in %.1fs",
-                        resp.status_code,
-                        attempt + 1,
-                        GEMINI_MAX_RETRIES + 1,
-                        wait,
-                    )
-                    time.sleep(wait)
-                    continue
-                else:
-                    logger.warning(
-                        "[NoteFormatter] Gemini %d after %d attempts; giving up.",
-                        resp.status_code,
-                        GEMINI_MAX_RETRIES + 1,
-                    )
-                    return None
-
-            else:
-                logger.warning(
-                    "[NoteFormatter] Gemini HTTP %d (attempt %d): %s",
-                    resp.status_code,
-                    attempt + 1,
-                    resp.text[:300],
-                )
-                return None
-
-        except Exception as exc:
+        elif resp.status_code in (429, 503):
+            _CIRCUIT_BREAKER_UNTIL = time.time() + 180.0
             logger.warning(
-                "[NoteFormatter] Gemini request exception (attempt %d): %s: %s",
-                attempt + 1,
-                type(exc).__name__,
-                str(exc),
+                "[NoteFormatter] Gemini %d rate limit reached; tripping circuit breaker for 180s. Using fast local cleaner.",
+                resp.status_code,
             )
-            if attempt < GEMINI_MAX_RETRIES:
-                time.sleep(GEMINI_RETRY_BASE_SECONDS * (2 ** attempt))
-            else:
-                return None
+            return None
 
-    return None
+        else:
+            logger.warning(
+                "[NoteFormatter] Gemini HTTP %d: %s",
+                resp.status_code,
+                resp.text[:200],
+            )
+            return None
+
+    except Exception as exc:
+        logger.warning(
+            "[NoteFormatter] Gemini call skipped (%s: %s); using local cleaner.",
+            type(exc).__name__,
+            str(exc),
+        )
+        return None
 
 
 # ---------------------------------------------------------------------------

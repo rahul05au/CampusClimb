@@ -31,12 +31,12 @@ class RAGSettings:
 
     # LLM Generation Parameters
     GEMINI_MODEL: str = os.getenv("GEMINI_MODEL", "gemini-flash-latest").strip() or "gemini-flash-latest"
-    FALLBACK_MODELS: tuple = ("gemini-flash-latest", "gemini-flash-lite-latest", "gemini-pro-latest")
+    FALLBACK_MODELS: tuple = ("gemini-flash-latest", "gemini-3-flash-preview", "gemini-3.1-flash-lite", "gemini-pro-latest")
     TEMPERATURE_GROUNDED: float = float(os.getenv("RAG_TEMP_GROUNDED", "0.2"))
     TEMPERATURE_FALLBACK: float = float(os.getenv("RAG_TEMP_FALLBACK", "0.3"))
     MAX_OUTPUT_TOKENS: int = int(os.getenv("RAG_MAX_OUTPUT_TOKENS", "4096"))
-    HTTP_TIMEOUT_SECONDS: float = float(os.getenv("RAG_HTTP_TIMEOUT", "45.0"))
-    MAX_RETRIES: int = int(os.getenv("RAG_MAX_RETRIES", "2"))
+    HTTP_TIMEOUT_SECONDS: float = float(os.getenv("RAG_HTTP_TIMEOUT", "15.0"))
+    MAX_RETRIES: int = int(os.getenv("RAG_MAX_RETRIES", "1"))
 
 
 # Singleton settings instance

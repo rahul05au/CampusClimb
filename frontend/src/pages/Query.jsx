@@ -6,13 +6,17 @@ import {
   AlertTriangle, Clock, Trash2, Languages, BookOpen, ChevronRight,
   UploadCloud, CheckCircle2, X, Copy, Check, FileText,
   Mic, Layers, HelpCircle,
-  Cpu, BookCheck, Volume2, VolumeX, Plus, Square, Pause, Play,
-  PhoneCall, Phone
+  Cpu, BookCheck, Volume2, VolumeX, Plus, Square,
+  PhoneCall, Phone, Zap
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import axios from 'axios';
 import mermaid from 'mermaid';
 import AITeacherCallModal from '../components/ai-teacher/AITeacherCallModal';
+import RevisionModal from '../components/study/RevisionModal';
+import QuizModal from '../components/study/QuizModal';
+import FlashcardsModal from '../components/study/FlashcardsModal';
+import MobileNavigation from '../components/MobileNavigation';
 
 const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000';
 const DEFAULT_SUBJECTS = ['Operating Systems', 'DBMS', 'Computer Networks', 'Research'];
@@ -307,6 +311,9 @@ export default function Query() {
   const [totalSentencesCount, setTotalSentencesCount] = useState(0);
   const [speechSupported, setSpeechSupported] = useState(true);
   const [isTeacherCallOpen, setIsTeacherCallOpen] = useState(false);
+  const [teacherTopic, setTeacherTopic] = useState('');
+  const [teacherPrompt, setTeacherPrompt] = useState('');
+  const [activeStudyModal, setActiveStudyModal] = useState({ type: null, topicName: '' });
   const [autoSpeak, setAutoSpeak] = useState(() => {
     return localStorage.getItem('campusclimb_autospeak') === 'true';
   });
@@ -379,7 +386,7 @@ export default function Query() {
     } finally {
       setSourcesLoading(false);
     }
-  }, [token, subject, getStorageKey]);
+  }, [token, getToken, subject, getStorageKey]);
 
   useEffect(() => {
     fetchSources(subject);
@@ -413,8 +420,10 @@ export default function Query() {
     }
     setDeletingSourceId(sourceId);
     try {
+      const activeToken = (await getToken?.()) || token;
+      const headers = activeToken ? { Authorization: `Bearer ${activeToken}` } : {};
       await axios.delete(`${API_BASE_URL}/api/v1/agent/sources/${sourceId}`, {
-        headers: { Authorization: `Bearer ${token}` }
+        headers,
       });
       const remainingSources = availableSources.filter((s) => s.id !== sourceId);
       const remainingSelected = selectedSourceIds.filter((id) => id !== sourceId);
@@ -750,6 +759,8 @@ export default function Query() {
     ]).flat();
 
     try {
+      const activeToken = (await getToken?.()) || token;
+      const headers = activeToken ? { Authorization: `Bearer ${activeToken}` } : {};
       const res = await axios.post(
         `${API_BASE_URL}/api/v1/agent/query`,
         {
@@ -759,7 +770,7 @@ export default function Query() {
           selected_source_ids: sourceIds,
           chat_history: chatHistoryPayload,
         },
-        { headers: { Authorization: `Bearer ${token}` } }
+        { headers }
       );
 
       setResult(res.data);
@@ -781,7 +792,12 @@ export default function Query() {
       } else {
         setVoiceStatus('IDLE');
       }
-      const apiErr = err.response?.data?.detail || 'Failed to process query. Please check your connection.';
+      let apiErr = err.response?.data?.detail || err.message || 'Failed to process query. Please check your connection.';
+      if (err.response?.status === 401) {
+        apiErr = 'Your session has expired. Please sign in again.';
+      } else if (err.message && err.message.toLowerCase().includes('network error')) {
+        apiErr = 'Cannot connect to CampusClimb backend. Please ensure the backend server is running on port 8000.';
+      }
       setError(typeof apiErr === 'string' ? apiErr : JSON.stringify(apiErr));
     } finally {
       setLoading(false);
@@ -910,8 +926,19 @@ export default function Query() {
     });
   };
 
+  if (authLoading) {
+    return (
+      <div className="min-h-screen bg-[#070707] text-neutral-100 font-mono flex items-center justify-center">
+        <div className="flex flex-col items-center gap-3">
+          <RefreshCw className="w-6 h-6 text-teal-400 animate-spin" />
+          <span className="text-xs text-neutral-400 tracking-wider">Verifying authenticated session...</span>
+        </div>
+      </div>
+    );
+  }
+
   return (
-    <div className="min-h-screen bg-[#070707] text-neutral-100 flex flex-col font-sans selection:bg-teal-500/20 selection:text-teal-300">
+    <div className="app-workspace min-h-screen bg-[#070707] text-neutral-100 flex flex-col font-sans selection:bg-teal-500/20 selection:text-teal-300">
       {/* ── Top Navbar ── */}
       <header className="border-b border-neutral-800/80 bg-[#0a0a0a]/80 backdrop-blur-md sticky top-0 z-40">
         <div className="max-w-7xl mx-auto px-3 sm:px-6 h-16 flex items-center justify-between">
@@ -1380,6 +1407,30 @@ export default function Query() {
                         </span>
                       )}
 
+                      {/* Syllabus Guardrail Badge */}
+                      {result.syllabus_alignment && (
+                        <span
+                          className={`inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-semibold font-sans ${
+                            result.syllabus_alignment.is_aligned
+                              ? 'bg-teal-950/60 text-teal-300 border border-teal-500/30'
+                              : 'bg-neutral-900 text-neutral-400 border border-neutral-800'
+                          }`}
+                          title={result.syllabus_alignment.reason || ''}
+                        >
+                          {result.syllabus_alignment.is_aligned ? (
+                            <>
+                              <span className="w-1.5 h-1.5 rounded-full bg-teal-400" />
+                              <span>✓ In Syllabus {result.syllabus_alignment.unit_number ? `(Unit ${result.syllabus_alignment.unit_number})` : ''}</span>
+                            </>
+                          ) : (
+                            <>
+                              <span className="w-1.5 h-1.5 rounded-full bg-amber-400" />
+                              <span>ℹ Out of Syllabus · General Knowledge</span>
+                            </>
+                          )}
+                        </span>
+                      )}
+
                       {/* Detected Language Tag */}
                       <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-mono text-neutral-400 bg-neutral-900 border border-neutral-800">
                         <Languages className="w-3 h-3 text-teal-400" />
@@ -1425,6 +1476,60 @@ export default function Query() {
                         title="Copy Answer"
                       >
                         {copied ? <Check className="w-3.5 h-3.5 text-teal-400" /> : <Copy className="w-3.5 h-3.5" />}
+                      </button>
+                    </div>
+                  </motion.div>
+
+                  {/* Contextual Topic Actions (Academic Intelligence Loop) */}
+                  <motion.div
+                    variants={{ hidden: { opacity: 0, y: 10 }, visible: { opacity: 1, y: 0 } }}
+                    className="flex flex-wrap items-center justify-between gap-2.5 p-3 rounded-xl bg-neutral-950/80 border border-neutral-800/90 text-xs"
+                  >
+                    <div className="flex items-center gap-2">
+                      <span className="text-[11px] font-mono text-neutral-400">
+                        Topic Actions for <span className="text-teal-300 font-semibold">{result.matched_topic}</span>:
+                      </span>
+                    </div>
+
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <button
+                        type="button"
+                        onClick={() => setActiveStudyModal({ type: 'revision', topicName: result.matched_topic })}
+                        className="px-2.5 py-1 rounded-lg bg-teal-500/10 border border-teal-500/30 text-teal-300 hover:bg-teal-500/20 text-[11px] font-mono flex items-center gap-1.5 transition-colors"
+                      >
+                        <Clock className="w-3 h-3 text-teal-400" />
+                        <span>2-Min Revision</span>
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={() => setActiveStudyModal({ type: 'quiz', topicName: result.matched_topic })}
+                        className="px-2.5 py-1 rounded-lg bg-neutral-900 border border-neutral-800 text-neutral-200 hover:text-white text-[11px] font-mono flex items-center gap-1.5 transition-colors"
+                      >
+                        <Zap className="w-3 h-3 text-teal-400" />
+                        <span>Quiz Me</span>
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={() => setActiveStudyModal({ type: 'flashcards', topicName: result.matched_topic })}
+                        className="px-2.5 py-1 rounded-lg bg-neutral-900 border border-neutral-800 text-neutral-200 hover:text-white text-[11px] font-mono flex items-center gap-1.5 transition-colors"
+                      >
+                        <Layers className="w-3 h-3 text-teal-400" />
+                        <span>Flashcards</span>
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setTeacherTopic(result.matched_topic);
+                          setTeacherPrompt(`Teach me about ${result.matched_topic} with respect to: ${query}`);
+                          setIsTeacherCallOpen(true);
+                        }}
+                        className="px-3 py-1 rounded-lg bg-teal-500/10 border border-teal-500/40 text-teal-300 hover:bg-teal-500/20 text-[11px] font-mono font-semibold flex items-center gap-1.5 transition-colors ml-auto"
+                      >
+                        <Phone className="w-3 h-3 text-teal-400" />
+                        <span>Ask AI Teacher</span>
                       </button>
                     </div>
                   </motion.div>
@@ -1661,13 +1766,46 @@ export default function Query() {
       {/* AI Teacher Call Overlay Modal */}
       <AITeacherCallModal
         isOpen={isTeacherCallOpen}
-        onClose={() => setIsTeacherCallOpen(false)}
+        onClose={() => {
+          setIsTeacherCallOpen(false);
+          setTeacherPrompt('');
+          setTeacherTopic('');
+        }}
         subject={subject}
         selectedSourceIds={selectedSourceIds}
         token={token}
         initialHistory={history}
         onSyncHistory={(newEntry) => setHistory((h) => [newEntry, ...h].slice(0, 8))}
+        initialPrompt={teacherPrompt}
+        initialTopic={teacherTopic}
       />
+
+      {/* Embedded Study Modals */}
+      <RevisionModal
+        isOpen={activeStudyModal.type === 'revision'}
+        onClose={() => setActiveStudyModal({ type: null, topicName: '' })}
+        subjectId={null}
+        subjectName={subject}
+        topicId={result?.matched_topic ? 1 : null}
+        topicName={activeStudyModal.topicName}
+      />
+      <QuizModal
+        isOpen={activeStudyModal.type === 'quiz'}
+        onClose={() => setActiveStudyModal({ type: null, topicName: '' })}
+        subjectId={null}
+        subjectName={subject}
+        topicId={result?.matched_topic ? 1 : null}
+        topicName={activeStudyModal.topicName}
+      />
+      <FlashcardsModal
+        isOpen={activeStudyModal.type === 'flashcards'}
+        onClose={() => setActiveStudyModal({ type: null, topicName: '' })}
+        subjectId={null}
+        subjectName={subject}
+        topicId={result?.matched_topic ? 1 : null}
+        topicName={activeStudyModal.topicName}
+      />
+      <MobileNavigation subject={subject} />
     </div>
   );
 }

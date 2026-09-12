@@ -1,0 +1,263 @@
+1) The Hitchhiker’s Guide to Testing Statistical Significance in Natural
+Language Processing
+Rotem Dror
+Gili Baumer
+Segev Shlomov
+Roi Reichart = @inproceedings{dror-etal-2018-hitchhikers,
+    title = "The Hitchhiker{'}s Guide to Testing Statistical Significance in Natural Language Processing",
+    author = "Dror, Rotem  and
+      Baumer, Gili  and
+      Shlomov, Segev  and
+      Reichart, Roi",
+    editor = "Gurevych, Iryna  and
+      Miyao, Yusuke",
+    booktitle = "Proceedings of the 56th Annual Meeting of the Association for Computational Linguistics (Volume 1: Long Papers)",
+    month = jul,
+    year = "2018",
+    address = "Melbourne, Australia",
+    publisher = "Association for Computational Linguistics",
+    url = "https://aclanthology.org/P18-1128/",
+    doi = "10.18653/v1/P18-1128",
+    pages = "1383--1392",
+    abstract = "Statistical significance testing is a standard statistical tool designed to ensure that experimental results are not coincidental. In this opinion/ theoretical paper we discuss the role of statistical significance testing in Natural Language Processing (NLP) research. We establish the fundamental concepts of significance testing and discuss the specific aspects of NLP tasks, experimental setups and evaluation measures that affect the choice of significance tests in NLP research. Based on this discussion we propose a simple practical protocol for statistical significance test selection in NLP setups and accompany this protocol with a brief survey of the most relevant tests. We then survey recent empirical papers published in ACL and TACL during 2017 and show that while our community assigns great value to experimental results, statistical significance testing is often ignored or misused. We conclude with a brief discussion of open issues that should be properly addressed so that this important tool can be applied. in NLP research in a statistically sound manner."
+}
+
+
+
+2) Survey of Natural Language Processing for
+Education: Taxonomy, Systematic Review, and
+Future Trends
+Yunshi Lan*, Xinyuan Li, Hanyue Du, Xuesong Lu, Ming Gao, Weining Qian and Aoying Zhou,= Y. Lan et al., "Survey of Natural Language Processing for Education: Taxonomy, Systematic Review, and Future Trends," in IEEE Transactions on Knowledge and Data Engineering, vol. 38, no. 1, pp. 659-678, Jan. 2026, doi: 10.1109/TKDE.2025.3621181.
+keywords: {Education;Natural language processing;Question answering (information retrieval);Codes;Taxonomy;Surveys;Error correction;Problem-solving;Soft sensors;Knowledge graphs;Natural language processing (NLP);educational NLP;educational applications;question answering;question construction;automated assessment;error correction;survey},
+
+  
+
+3) Sentence-BERT: Sentence Embeddings using Siamese BERT-Networks
+Nils Reimers and Iryna Gurevych = @inproceedings{reimers-gurevych-2019-sentence,
+    title = "Sentence-{BERT}: Sentence Embeddings using {S}iamese {BERT}-Networks",
+    author = "Reimers, Nils  and
+      Gurevych, Iryna",
+    editor = "Inui, Kentaro  and
+      Jiang, Jing  and
+      Ng, Vincent  and
+      Wan, Xiaojun",
+    booktitle = "Proceedings of the 2019 Conference on Empirical Methods in Natural Language Processing and the 9th International Joint Conference on Natural Language Processing (EMNLP-IJCNLP)",
+    month = nov,
+    year = "2019",
+    address = "Hong Kong, China",
+    publisher = "Association for Computational Linguistics",
+    url = "https://aclanthology.org/D19-1410/",
+    doi = "10.18653/v1/D19-1410",
+    pages = "3982--3992",
+    abstract = "BERT (Devlin et al., 2018) and RoBERTa (Liu et al., 2019) has set a new state-of-the-art performance on sentence-pair regression tasks like semantic textual similarity (STS). However, it requires that both sentences are fed into the network, which causes a massive computational overhead: Finding the most similar pair in a collection of 10,000 sentences requires about 50 million inference computations ({\textasciitilde}65 hours) with BERT. The construction of BERT makes it unsuitable for semantic similarity search as well as for unsupervised tasks like clustering. In this publication, we present Sentence-BERT (SBERT), a modification of the pretrained BERT network that use siamese and triplet network structures to derive semantically meaningful sentence embeddings that can be compared using cosine-similarity. This reduces the effort for finding the most similar pair from 65 hours with BERT / RoBERTa to about 5 seconds with SBERT, while maintaining the accuracy from BERT. We evaluate SBERT and SRoBERTa on common STS tasks and transfer learning tasks, where it outperforms other state-of-the-art sentence embeddings methods."
+}
+
+
+
+4)PERSONALIZED STUDENT KNOWLEDGE MODELING FOR FUTURE
+LEARNING RESOURCE PREDICTION = Cite this paper
+Hashemifar, S., Sahebi, S. (2025). Personalized Student Knowledge Modeling for Future Learning Resource Prediction. In: Cristea, A.I., Walker, E., Lu, Y., Santos, O.C., Isotani, S. (eds) Artificial Intelligence in Education. AIED 2025. Lecture Notes in Computer Science(), vol 15879. Springer, Cham. https://doi.org/10.1007/978-3-031-98420-4_18
+
+Download citation
+.RIS.ENW.BIB
+DOI
+https://doi.org/10.1007/978-3-031-98420-4_18
+
+Published
+15 July 2025
+
+Publisher Name
+Springer, Cham
+
+Print ISBN
+978-3-031-98419-8
+
+Online ISBN
+978-3-031-98420-4 
+
+
+5) Intelligent Syllabus Mapping and Performance 
+Analysis System Using NLP and Neural Networks  = V. Lobo, S. Bhaskar, S. S, R. Suvarna and V. V. V, "Intelligent Syllabus Mapping and Performance Analysis System Using NLP and Neural Networks," 2025 International Conference on Emerging Trends in Industry 4.0 Technologies (ICETI4T), Navi Mumbai, India, 2025, pp. 1-6, doi: 10.1109/ICETI4T63625.2025.11132157. keywords: {Neural networks;Standards organizations;Redundancy;Organizations;Market research;Natural language processing;Performance analysis;Planning;Fourth Industrial Revolution;Resource management;Automated Content Extraction;Data-Driven Approach;Educational Planning;Instructional Strategies;Natural Language Processing (NLP);Neural Networks;Performance Analysis;Personalized L earning;Student Performance Data},
+
+   
+
+
+6) Clustering Introductory Computer Science Exercises
+Using Topic Modeling Methods
+Laura O. Moraes and Carlos Eduardo Pedreira, Senior Member, IEEE = L. Oliveira Moraes and C. E. Pedreira, "Clustering Introductory Computer Science Exercises Using Topic Modeling Methods," in IEEE Transactions on Learning Technologies, vol. 14, no. 1, pp. 42-54, Feb. 2021, doi: 10.1109/TLT.2021.3056907.
+keywords: {Task analysis;Computational modeling;Python;Semantics;Measurement;Manuals;Labeling;Clustering;computer science education;educational data mining;topic modeling},
+
+
+
+7) Automated Mapping of Course Outcomes to 
+Program Outcomes using Natural Language 
+Processing and Machine Learning = S. Sengupta and A. K. Das, "Automated Mapping of Course Outcomes to Program Outcomes using Natural Language Processing and Machine Learning," 2023 IEEE 3rd Applied Signal Processing Conference (ASPCON), India, 2023, pp. 44-48, doi: 10.1109/ASPCON59071.2023.10396272. keywords: {Vocabulary;Transfer learning;Feature extraction;Transformers;Natural language processing;Task analysis;Standards;Curriculum mapping;Outcome-based Education;CO-PO mapping;NLP;ML;BERT},
+
+
+
+8) Approximate Statistical Tests for Comparing Supervised
+Classification Learning Algorithms
+Thomas G. Dietterich
+Department of Computer Science, Oregon State University, Corvallis, OR 97331,
+U.S.A. = Provider: Silverchair
+Database: MITPress
+Content: text/plain; charset="UTF-8"
+
+TY  - JOUR
+AU  - Dietterich, Thomas G.
+T1  - Approximate Statistical Tests for Comparing Supervised Classification Learning Algorithms
+PY  - 1998
+Y1  - 1998/10/01
+DO  - 10.1162/089976698300017197
+JO  - Neural Computation
+JA  - Neural Comput
+VL  - 10
+IS  - 7
+SP  - 1895
+EP  - 1923
+SN  - 0899-7667
+AB  - This article reviews five approximate statistical tests for determining whether one learning algorithm outperforms another on a particular learning task. These test sare compared experimentally to determine their probability of incorrectly detecting a difference when no difference exists (type I error). Two widely used statistical tests are shown to have high probability of type I error in certain situations and should never be used: a test for the difference of two proportions and a paired-differences t test based on taking several random train-test splits. A third test, a paired-differences t test based on 10-fold cross-validation, exhibits somewhat elevated probability of type I error. A fourth test, McNemar's test, is shown to have low type I error. The fifth test is a new test, 5 × 2 cv, based on five iterations of twofold cross-validation. Experiments show that this test also has acceptable type I error. The article also measures the power (ability to detect algorithm differences when they do exist) of these tests. The cross-validated t test is the most powerful. The 5×2 cv test is shown to be slightly more powerful than McNemar's test. The choice of the best test is determined by the computational cost of running the learning algorithm. For algorithms that can be executed only once, Mc-Nemar's test is the only test with acceptable type I error. For algorithms that can be executed 10 times, the 5 × 2 cv test is recommended, because it is slightly more powerful and because it directly measures variation due to the choice of training set.
+Y2  - 7/15/2026
+UR  - https://doi.org/10.1162/089976698300017197
+ER  - 
+
+
+
+   
+
+9) Digital Object Identifier 10.1109/ACCESS.2026.3658439
+A Survey of Text Deduplication: From Syntactic
+Matching to Semantic Understanding
+JEONGMIN KIM ANDYEONSUPARK
+Department of Computer Science and Engineering, Kangwon National University, Chuncheon 24341, Republic of Korea
+Corresponding author: Yeonsu Park (yeonsu.park@kangwon.ac.kr)
+This work was supported by the National Research Foundation of Korea (NRF) grant funded by Korean Government (MSIT)
+under Grant RS-2023-00242528. = 
+
+
+
+
+
+
+10)Duplicate Record Detection: A Survey
+Ahmed K. Elmagarmid, Senior Member, IEEE,
+Panagiotis G. Ipeirotis, Member, IEEE Computer Society, and
+Vassilios S. Verykios, Member, IEEE Computer Society = A. K. Elmagarmid, P. G. Ipeirotis and V. S. Verykios, "Duplicate Record Detection: A Survey," in IEEE Transactions on Knowledge and Data Engineering, vol. 19, no. 1, pp. 1-16, Jan. 2007, doi: 10.1109/TKDE.2007.250581.
+keywords: {Computer errors;Mirrors;Computer Society;Detection algorithms;Cleaning;Scalability;Couplings;Uncertainty;Relational databases;Cost function;Duplicate detection;data cleaning;data integration;record linkage;data deduplication;instance identification;database hardening;name matching;identity uncertainty;entity resolution;fuzzy duplicate detection;entity matching.},
+
+   
+
+11)Representation learning for very short texts using weighted word embedding aggregation - Cedric De Boom, Steven Van Canneyt, Thomas Demeester, Bart Dhoedt,
+Representation learning for very short texts using weighted word embedding aggregation,
+Pattern Recognition Letters,
+Volume 80,
+2016,
+Pages 150-156,
+ISSN 0167-8655,
+https://doi.org/10.1016/j.patrec.2016.06.012.
+(https://www.sciencedirect.com/science/article/pii/S0167865516301362)
+Abstract: Short text messages such as tweets are very noisy and sparse in their use of vocabulary. Traditional textual representations, such as tf-idf, have difficulty grasping the semantic meaning of such texts, which is important in applications such as event detection, opinion mining, news recommendation, etc. We constructed a method based on semantic word embeddings and frequency information to arrive at low-dimensional representations for short texts designed to capture semantic similarity. For this purpose we designed a weight-based model and a learning procedure based on a novel median-based loss function. This paper discusses the details of our model and the optimization methods, together with the experimental results on both Wikipedia and Twitter data. We find that our method outperforms the baseline approaches in the experiments, and that it generalizes well on different word embeddings without retraining. Our method is therefore capable of retaining most of the semantic information in the text, and is applicable out-of-the-box.
+Keywords: Information storage and retrieval; Natural language processing; Artificial intelligence; Word embeddings; Representation learning
+
+
+
+12)Detecting latent topics and trends in blended learning 
+using LDA topic modeling = TY  - JOUR
+AU  - Yin, Bin
+AU  - Yuan, Chih-Hung
+PY  - 2022
+DA  - 2022/11/01
+TI  - Detecting latent topics and trends in blended learning using LDA topic modeling
+JO  - Education and Information Technologies
+SP  - 12689
+EP  - 12712
+VL  - 27
+IS  - 9
+AB  - With the rapid application of blended learning around the world, a large amount of literature has been accumulated. The analysis of the main research topics and development trends based on a large amount of literature is of great significance. To address this issue, this paper collected abstracts from 3772 eligible papers published between 2003 and 2021 from the Web of Science core collection. Through LDA topic modeling, abstract text content was analyzed, then 7 well-defined research topics were obtained. According to the topic development trends analysis results, the emphasis of topic research shifted from the initial courses about health, medicine, nursing, chemistry and mathematics to learning key elements such as learning outcomes, teacher factors, and presences. Among 7 research topics, the popularity of presences increased significantly, while formative assessment was a rare topic requiring careful intervention. The other five topics had no significant increase or decrease trends, but still accounted for a considerable proportion. Through word cloud analysis technology, the keyword characteristics of each stage and research focus changes of research were obtained. This study provides useful insights and implications for blended learning related research.
+SN  - 1573-7608
+UR  - https://doi.org/10.1007/s10639-022-11118-0
+DO  - 10.1007/s10639-022-11118-0
+ID  - Yin2022
+ER  - 
+   
+
+13) Block-regularized 5 × 2 Cross-validated
+McNemar’s Test for Comparing Two
+Classification Algorithms
+Jing Yang, Ruibo Wang, Yijun Song, Jihong Li
+
+
+
+14) BERT Pre-training of Deep Bidirectional Transformers for Language Understanding = @inproceedings{devlin-etal-2019-bert,
+    title = "{BERT}: Pre-training of Deep Bidirectional Transformers for Language Understanding",
+    author = "Devlin, Jacob  and
+      Chang, Ming-Wei  and
+      Lee, Kenton  and
+      Toutanova, Kristina",
+    editor = "Burstein, Jill  and
+      Doran, Christy  and
+      Solorio, Thamar",
+    booktitle = "Proceedings of the 2019 Conference of the North {A}merican Chapter of the Association for Computational Linguistics: Human Language Technologies, Volume 1 (Long and Short Papers)",
+    month = jun,
+    year = "2019",
+    address = "Minneapolis, Minnesota",
+    publisher = "Association for Computational Linguistics",
+    url = "https://aclanthology.org/N19-1423/",
+    doi = "10.18653/v1/N19-1423",
+    pages = "4171--4186",
+    abstract = "We introduce a new language representation model called BERT, which stands for Bidirectional Encoder Representations from Transformers. Unlike recent language representation models (Peters et al., 2018a; Radford et al., 2018), BERT is designed to pre-train deep bidirectional representations from unlabeled text by jointly conditioning on both left and right context in all layers. As a result, the pre-trained BERT model can be fine-tuned with just one additional output layer to create state-of-the-art models for a wide range of tasks, such as question answering and language inference, without substantial task-specific architecture modifications. BERT is conceptually simple and empirically powerful. It obtains new state-of-the-art results on eleven natural language processing tasks, including pushing the GLUE score to 80.5 (7.7 point absolute improvement), MultiNLI accuracy to 86.7{\%} (4.6{\%} absolute improvement), SQuAD v1.1 question answering Test F1 to 93.2 (1.5 point absolute improvement) and SQuAD v2.0 Test F1 to 83.1 (5.1 point absolute improvement)."
+}
+
+
+15)MPNet: Masked and Permuted Pre-training for
+Language Understanding = Kaitao Song, Xu Tan, Tao Qin, Jianfeng Lu, Tie-Yan Liu = @inproceedings{song2020mpnet,
+title={MPNet: Masked and Permuted Pre-training for Language Understanding},
+author={Song, Kaitao and Tan, Xu and Qin, Tao and Lu, Jianfeng and Liu, Tie-Yan},
+booktitle={Advances in Neural Information Processing Systems 33 (NeurIPS 2020)},
+year={2020}, url={https://arxiv.org/abs/2004.09297}
+}
+
+
+16) R2DE: a NLP approach to estimating IRT parameters of newlygenerated question = @inproceedings{10.1145/3375462.3375517,
+author = {Benedetto, Luca and Cappelli, Andrea and Turrin, Roberto and Cremonesi, Paolo},
+title = {R2DE: a NLP approach to estimating IRT parameters of newly generated questions},
+year = {2020},
+isbn = {9781450377126},
+publisher = {Association for Computing Machinery},
+address = {New York, NY, USA},
+url = {https://doi.org/10.1145/3375462.3375517},
+doi = {10.1145/3375462.3375517},
+abstract = {The main objective of exams consists in performing an assessment of students' expertise on a specific subject. Such expertise, also referred to as skill or knowledge level, can then be leveraged in different ways (e.g., to assign a grade to the students, to understand whether a student might need some support, etc.). Similarly, the questions appearing in the exams have to be assessed in some way before being used to evaluate students. Standard approaches to questions' assessment are either subjective (e.g., assessment by human experts) or introduce a long delay in the process of question generation (e.g., pretesting with real students). In this work we introduce R2DE (which is a Regressor for Difficulty and Discrimination Estimation), a model capable of assessing newly generated multiple-choice questions by looking at the text of the question and the text of the possible choices. In particular, it can estimate the difficulty and the discrimination of each question, as they are defined in Item Response Theory. We also present the results of extensive experiments we carried out on a real world large scale dataset coming from an e-learning platform, showing that our model can be used to perform an initial assessment of newly created questions and ease some of the problems that arise in question generation.},
+booktitle = {Proceedings of the Tenth International Conference on Learning Analytics \& Knowledge},
+pages = {412–421},
+numpages = {10},
+keywords = {natural language processing, learning analytics, latent traits estimation, knowledge tracing, item response theory, educational data mining},
+location = {Frankfurt, Germany},
+series = {LAK '20}
+}
+
+17) SemEval-2017 Task 1: Semantic Textual Similarity
+Mltilingual and Cross-lingual Focused Evaluation
+= @inproceedings{cer-etal-2017-semeval,
+    title = "{S}em{E}val-2017 Task 1: Semantic Textual Similarity Multilingual and Crosslingual Focused Evaluation",
+    author = "Cer, Daniel  and
+      Diab, Mona  and
+      Agirre, Eneko  and
+      Lopez-Gazpio, I{\~n}igo  and
+      Specia, Lucia",
+    editor = "Bethard, Steven  and
+      Carpuat, Marine  and
+      Apidianaki, Marianna  and
+      Mohammad, Saif M.  and
+      Cer, Daniel  and
+      Jurgens, David",
+    booktitle = "Proceedings of the 11th International Workshop on Semantic Evaluation ({S}em{E}val-2017)",
+    month = aug,
+    year = "2017",
+    address = "Vancouver, Canada",
+    publisher = "Association for Computational Linguistics",
+    url = "https://aclanthology.org/S17-2001/",
+    doi = "10.18653/v1/S17-2001",
+    pages = "1--14",
+    abstract = "Semantic Textual Similarity (STS) measures the meaning similarity of sentences. Applications include machine translation (MT), summarization, generation, question answering (QA), short answer grading, semantic search, dialog and conversational systems. The STS shared task is a venue for assessing the current state-of-the-art. The 2017 task focuses on multilingual and cross-lingual pairs with one sub-track exploring MT quality estimation (MTQE) data. The task obtained strong participation from 31 teams, with 17 participating in \textit{all language tracks}. We summarize performance and review a selection of well performing methods. Analysis highlights common errors, providing insight into the limitations of existing models. To support ongoing work on semantic representations, the \textit{STS Benchmark} is introduced as a new shared training and evaluation set carefully selected from the corpus of English STS shared task data (2012-2017)."
+}

@@ -4,11 +4,17 @@ import { useAuth } from '../context/AuthContext';
 import {
   Terminal, LogOut, UploadCloud, Sparkles, Database, FileText,
   CheckCircle2, Search, ChevronDown, ChevronUp, Layers, AlertCircle,
-  RefreshCw, ArrowRight, BookOpen, Zap, GitMerge, Layers3
+  RefreshCw, ArrowRight, BookOpen, Zap, GitMerge, Layers3, Clock
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import axios from 'axios';
 import mermaid from 'mermaid';
+import ExamCommandCenter from '../components/study/ExamCommandCenter';
+import RevisionModal from '../components/study/RevisionModal';
+import QuizModal from '../components/study/QuizModal';
+import FlashcardsModal from '../components/study/FlashcardsModal';
+import StructuredNoteContent from '../components/study/StructuredNoteContent';
+import MobileNavigation from '../components/MobileNavigation';
 
 mermaid.initialize({
   startOnLoad: false,
@@ -78,6 +84,7 @@ export default function Dashboard() {
   const initialSubject = searchParams.get('subject') || localStorage.getItem('campusclimb_active_subject') || 'Operating Systems';
   const [subjects, setSubjects] = useState(['Operating Systems', 'DBMS', 'Computer Networks', 'Research']);
   const [selectedSubject, setSelectedSubjectState] = useState(initialSubject);
+  const [activeStudyModal, setActiveStudyModal] = useState({ type: null, topicId: null, topicName: '' });
 
   const setSelectedSubject = (subj) => {
     setSelectedSubjectState(subj);
@@ -134,7 +141,10 @@ export default function Dashboard() {
 
   const fetchDashboardData = useCallback(async (subj) => {
     const activeToken = (await getToken?.()) || token;
-    if (!activeToken) return;
+    if (!activeToken) {
+      setLoading(false);
+      return;
+    }
     setLoading(true);
     setError('');
     try {
@@ -189,8 +199,19 @@ export default function Dashboard() {
     dedup_reduction_pct: 0,
   };
 
+  if (authLoading) {
+    return (
+      <div className="min-h-screen bg-[#0a0a0a] text-neutral-100 font-mono flex items-center justify-center">
+        <div className="flex flex-col items-center gap-3">
+          <RefreshCw className="w-6 h-6 text-teal-400 animate-spin" />
+          <span className="text-xs text-neutral-400 tracking-wider">Verifying authenticated session...</span>
+        </div>
+      </div>
+    );
+  }
+
   return (
-    <div className="min-h-screen bg-[#0a0a0a] text-neutral-100 font-mono flex flex-col selection:bg-teal-600 selection:text-white">
+    <div className="app-workspace min-h-screen bg-[#0a0a0a] text-neutral-100 font-mono flex flex-col selection:bg-teal-600 selection:text-white">
       {/* Header */}
       <header className="border-b border-neutral-800 bg-[#0a0a0a]/90 backdrop-blur-md px-3 sm:px-6 py-3 sm:py-4 flex items-center justify-between sticky top-0 z-50">
         <Link to="/" className="flex items-center gap-2 sm:gap-3 min-w-0">
@@ -262,6 +283,14 @@ export default function Dashboard() {
             </select>
           </div>
         </div>
+
+        {/* Academic Intelligence: Exam Command Center */}
+        <section id="study-workspace" className="scroll-mt-24">
+        <ExamCommandCenter
+          subjectName={selectedSubject}
+          onRefreshNeeded={() => fetchDashboardData(selectedSubject)}
+        />
+        </section>
 
         {/* Overview Metric Strip (4 Cards) */}
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
@@ -464,6 +493,38 @@ export default function Dashboard() {
                             </div>
                           </div>
 
+                          {/* Quick Topic Study Actions */}
+                          <div className="flex flex-wrap items-center gap-2 pt-2.5 pb-1">
+                            <button
+                              onClick={() => setActiveStudyModal({ type: 'revision', topicId: topic.id, topicName: topic.topic_name })}
+                              className="px-2.5 py-1 rounded bg-teal-500/10 border border-teal-500/20 text-teal-300 hover:bg-teal-500/20 text-[11px] font-mono flex items-center gap-1 transition-colors"
+                            >
+                              <Clock className="w-3 h-3 text-teal-400" />
+                              <span>2-Min Revision</span>
+                            </button>
+                            <button
+                              onClick={() => setActiveStudyModal({ type: 'quiz', topicId: topic.id, topicName: topic.topic_name })}
+                              className="px-2.5 py-1 rounded bg-neutral-900 border border-neutral-800 text-neutral-300 hover:text-white text-[11px] font-mono flex items-center gap-1 transition-colors"
+                            >
+                              <Zap className="w-3 h-3 text-teal-400" />
+                              <span>Quiz Me</span>
+                            </button>
+                            <button
+                              onClick={() => setActiveStudyModal({ type: 'flashcards', topicId: topic.id, topicName: topic.topic_name })}
+                              className="px-2.5 py-1 rounded bg-neutral-900 border border-neutral-800 text-neutral-300 hover:text-white text-[11px] font-mono flex items-center gap-1 transition-colors"
+                            >
+                              <Layers className="w-3 h-3 text-teal-400" />
+                              <span>Flashcards</span>
+                            </button>
+                            <Link
+                              to={`/query?subject=${encodeURIComponent(selectedSubject)}&topic=${encodeURIComponent(topic.topic_name)}`}
+                              className="px-2.5 py-1 rounded bg-neutral-900 border border-neutral-800 text-neutral-400 hover:text-teal-300 text-[11px] font-mono flex items-center gap-1 transition-colors ml-auto"
+                            >
+                              <BookOpen className="w-3 h-3 text-neutral-400" />
+                              <span>Query Topic</span>
+                            </Link>
+                          </div>
+
                           {/* 2. Dedup proof badge (Research Stat Strip) */}
                           {hasMultipleSources && (
                             <div className="mt-3 py-2 px-3 rounded-lg bg-teal-950/30 border border-teal-500/30 flex flex-wrap items-center justify-between gap-2 text-xs">
@@ -513,56 +574,11 @@ export default function Dashboard() {
                                         </span>
                                       </div>
 
-                                      {/* Formatted Clean Note Display */}
-                                      <div className="text-sm text-neutral-200 font-sans leading-relaxed space-y-2">
-                                        {mergedNote.representative_text ? (
-                                          mergedNote.representative_text.split('\n').map((line, lIdx) => {
-                                            const trimmed = line.trim();
-                                            if (!trimmed) return null;
-                                            
-                                            // Heading 3 / ###
-                                            if (trimmed.startsWith('### ')) {
-                                              return (
-                                                <h4 key={lIdx} className="text-sm font-bold text-teal-300 pt-2 pb-1 border-b border-neutral-800/60 font-mono">
-                                                  {trimmed.replace(/^###\s+/, '')}
-                                                </h4>
-                                              );
-                                            }
-                                            // Bullet point (- or • or *)
-                                            if (/^[-*•]\s+/.test(trimmed)) {
-                                              const content = trimmed.replace(/^[-*•]\s+/, '');
-                                              const parts = content.split(/(\*\*.*?\*\*)/g);
-                                              return (
-                                                <div key={lIdx} className="flex items-start gap-2 text-xs sm:text-sm text-neutral-300 pl-2">
-                                                  <span className="w-1.5 h-1.5 rounded-full bg-teal-400 mt-1.5 shrink-0" />
-                                                  <span>
-                                                    {parts.map((p, pIdx) => {
-                                                      if (p.startsWith('**') && p.endsWith('**')) {
-                                                        return <strong key={pIdx} className="text-neutral-100 font-semibold">{p.slice(2, -2)}</strong>;
-                                                      }
-                                                      return p;
-                                                    })}
-                                                  </span>
-                                                </div>
-                                              );
-                                            }
-                                            // Standard paragraph with bold parsing
-                                            const parts = trimmed.split(/(\*\*.*?\*\*)/g);
-                                            return (
-                                              <p key={lIdx} className="text-xs sm:text-sm text-neutral-300">
-                                                {parts.map((p, pIdx) => {
-                                                  if (p.startsWith('**') && p.endsWith('**')) {
-                                                    return <strong key={pIdx} className="text-neutral-100 font-semibold">{p.slice(2, -2)}</strong>;
-                                                  }
-                                                  return p;
-                                                })}
-                                              </p>
-                                            );
-                                          })
-                                        ) : (
-                                          <p className="text-xs text-neutral-500 italic">No note text available.</p>
-                                        )}
-                                      </div>
+                                      {/* Structured Academic Note Display */}
+                                      <StructuredNoteContent
+                                        text={mergedNote.representative_text}
+                                        fallbackTopic={topic.topic_name}
+                                      />
 
                                       {/* Render Mermaid Diagram if Synthesized */}
                                       {mergedNote.diagram_mermaid && (
@@ -653,17 +669,46 @@ export default function Dashboard() {
           </>
         )}
 
+        {/* Embedded Modals for Topic Actions */}
+        <RevisionModal
+          isOpen={activeStudyModal.type === 'revision'}
+          onClose={() => setActiveStudyModal({ type: null, topicId: null, topicName: '' })}
+          subjectId={data?.subject_id || null}
+          subjectName={selectedSubject}
+          topicId={activeStudyModal.topicId}
+          topicName={activeStudyModal.topicName}
+          onCompleted={() => fetchDashboardData(selectedSubject)}
+        />
+        <QuizModal
+          isOpen={activeStudyModal.type === 'quiz'}
+          onClose={() => setActiveStudyModal({ type: null, topicId: null, topicName: '' })}
+          subjectId={data?.subject_id || null}
+          subjectName={selectedSubject}
+          topicId={activeStudyModal.topicId}
+          topicName={activeStudyModal.topicName}
+          onCompleted={() => fetchDashboardData(selectedSubject)}
+        />
+        <FlashcardsModal
+          isOpen={activeStudyModal.type === 'flashcards'}
+          onClose={() => setActiveStudyModal({ type: null, topicId: null, topicName: '' })}
+          subjectId={data?.subject_id || null}
+          subjectName={selectedSubject}
+          topicId={activeStudyModal.topicId}
+          topicName={activeStudyModal.topicName}
+          onCompleted={() => fetchDashboardData(selectedSubject)}
+        />
+
       </main>
 
       {/* Sticky Bottom Query CTA Bar */}
-      <footer className="sticky bottom-0 z-40 bg-[#0a0a0a]/95 backdrop-blur-md border-t border-neutral-800 py-3.5 px-6">
+      <footer className="mobile-hide sticky bottom-0 z-40 bg-[#0a0a0a]/95 backdrop-blur-md border-t border-neutral-800 py-3.5 px-6">
         <div className="max-w-7xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-3 text-xs">
           <div className="flex items-center gap-2 text-neutral-300 font-mono">
             <CheckCircle2 className="w-4 h-4 text-teal-400" />
             <span>Ready to test your knowledge on {selectedSubject}?</span>
           </div>
           <Link
-            to="/query"
+            to={`/query?subject=${encodeURIComponent(selectedSubject)}`}
             className="w-full sm:w-auto px-5 py-2.5 bg-teal-600 hover:bg-teal-500 text-white font-bold uppercase tracking-wider rounded-lg transition-colors flex items-center justify-center gap-2 shadow-md shadow-teal-600/20"
           >
             <span>Launch Query Engine</span>
@@ -671,6 +716,7 @@ export default function Dashboard() {
           </Link>
         </div>
       </footer>
+      <MobileNavigation subject={selectedSubject} />
     </div>
   );
 }

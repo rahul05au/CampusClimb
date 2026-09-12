@@ -2,12 +2,13 @@ import React, { useState, useEffect, useRef } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import {
-  Terminal, LogOut, UploadCloud, FileText, CheckCircle2, Lock,
+  Terminal, LogOut, UploadCloud, FileText, CheckCircle2,
   Sparkles, BarChart3, Layers, AlertTriangle, RefreshCw, X,
   Award, ArrowRight, User
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import axios from 'axios';
+import MobileNavigation from '../components/MobileNavigation';
 
 const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000';
 const MAX_FILE_SIZE_MB = 15;
@@ -75,7 +76,7 @@ function FilePreviewChip({ file, onRemove }) {
 }
 
 // Reusable Drag & Drop Card Component
-function UploadDropZone({ onFileSelected, error, loading, progress, promptText, accept = '.pdf,application/pdf' }) {
+function UploadDropZone({ onFileSelected, error, loading, progress, stageText, promptText, accept = '.pdf,application/pdf' }) {
   const [isDragging, setIsDragging] = useState(false);
   const inputRef = useRef(null);
 
@@ -130,18 +131,51 @@ function UploadDropZone({ onFileSelected, error, loading, progress, promptText, 
       )}
 
       {loading && (
-        <div className="space-y-1.5 pt-1">
+        <div className="space-y-2 pt-1">
           <div className="flex justify-between text-[11px] text-neutral-400">
-            <span>Uploading &amp; processing pipeline...</span>
-            <span className="text-teal-400 font-semibold">{progress}%</span>
+            <span>
+              {stageText === 'uploading' || !stageText
+                ? 'Uploading file to server...'
+                : stageText === 'extracting'
+                ? 'Extracting text from PDF (native fast engine)...'
+                : stageText === 'chunking'
+                ? 'Chunking & reconstructing sentences...'
+                : stageText === 'embedding'
+                ? 'Generating semantic embeddings (SentenceTransformer)...'
+                : stageText === 'indexing'
+                ? 'Mapping topics & running deduplication...'
+                : stageText === 'completed'
+                ? 'Processing complete!'
+                : `Processing (${stageText})...`}
+            </span>
+            {stageText === 'uploading' || !stageText ? (
+              <span className="text-teal-400 font-semibold">{progress}%</span>
+            ) : (
+              <span className="text-teal-400 font-semibold animate-pulse">Processing</span>
+            )}
           </div>
           <div className="w-full h-2 bg-neutral-900 rounded-full overflow-hidden border border-neutral-800">
-            <motion.div
-              className="h-full bg-teal-500 rounded-full"
-              initial={{ width: 0 }}
-              animate={{ width: `${progress}%` }}
-              transition={{ duration: 0.2 }}
-            />
+            {stageText === 'uploading' || !stageText ? (
+              <motion.div
+                className="h-full bg-teal-500 rounded-full"
+                initial={{ width: 0 }}
+                animate={{ width: `${progress}%` }}
+                transition={{ duration: 0.2 }}
+              />
+            ) : (
+              <motion.div
+                className="h-full bg-teal-500 rounded-full"
+                animate={{
+                  x: ['-100%', '100%'],
+                  width: ['30%', '60%', '30%'],
+                }}
+                transition={{
+                  repeat: Infinity,
+                  duration: 1.4,
+                  ease: 'easeInOut',
+                }}
+              />
+            )}
           </div>
         </div>
       )}
@@ -194,7 +228,18 @@ export default function Upload() {
   const [notesError, setNotesError] = useState('');
   const [notesProgress, setNotesProgress] = useState(0);
   const [notesLoading, setNotesLoading] = useState(false);
+  const [notesStage, setNotesStage] = useState('');
   const [notesResult, setNotesResult] = useState(null);
+  const activePollRef = useRef(null);
+
+  useEffect(() => {
+    return () => {
+      if (activePollRef.current) {
+        clearTimeout(activePollRef.current);
+        activePollRef.current = null;
+      }
+    };
+  }, []);
 
   // Step 3: PYQs (Optional)
   const [pyqYear, setPyqYear] = useState(2024);
@@ -259,6 +304,24 @@ export default function Upload() {
     navigate('/login');
   };
 
+  const formatApiError = (err, fallback) => {
+    if (!err) return fallback;
+    if (err.response) {
+      const status = err.response.status;
+      const detail = err.response.data?.detail;
+      if (status === 401) return 'Your session expired. Please sign in again.';
+      if (status === 403) return "You don't have permission to access this resource.";
+      if (status === 422) return 'Please check the selected file/subject format.';
+      if (status >= 500) return 'Upload service is temporarily unavailable. Please retry.';
+      if (typeof detail === 'string') return detail;
+      if (detail && typeof detail === 'object') return JSON.stringify(detail);
+    }
+    if (err.message && err.message.toLowerCase().includes('network error')) {
+      return 'Connection lost. Check your internet connection and retry.';
+    }
+    return fallback;
+  };
+
   // Upload Syllabus
   const handleUploadSyllabus = async () => {
     if (!syllabusFile) return;
@@ -271,17 +334,20 @@ export default function Upload() {
     formData.append('subject', selectedSubject);
 
     try {
-      const activeToken = (await getToken?.()) || token;
+      const activeToken = (await getToken?.()) || token || (typeof window !== 'undefined' ? localStorage.getItem('campusclimb_token') : null);
+      const headers = {
+        'Content-Type': 'multipart/form-data',
+        ...(activeToken ? { Authorization: `Bearer ${activeToken}` } : {}),
+      };
       const res = await axios.post(`${API_BASE_URL}/upload/syllabus`, formData, {
-        headers: { Authorization: `Bearer ${activeToken}`, 'Content-Type': 'multipart/form-data' },
+        headers,
         onUploadProgress: (e) => setSyllabusProgress(Math.round((e.loaded * 100) / e.total)),
       });
       setSyllabusResult(res.data);
       setCompletedSteps((prev) => ({ ...prev, 1: true }));
       setCurrentStep(2);
     } catch (err) {
-      const apiErr = err.response?.data?.detail || 'Syllabus upload failed.';
-      setSyllabusError(typeof apiErr === 'string' ? apiErr : JSON.stringify(apiErr));
+      setSyllabusError(formatApiError(err, 'Syllabus upload failed. Please check the file.'));
     } finally {
       setSyllabusLoading(false);
     }
@@ -293,6 +359,7 @@ export default function Upload() {
     setNotesLoading(true);
     setNotesError('');
     setNotesProgress(0);
+    setNotesStage('uploading');
 
     const formData = new FormData();
     formData.append('file', notesFile);
@@ -300,18 +367,89 @@ export default function Upload() {
     formData.append('student_name', user?.email || 'Student');
 
     try {
-      const activeToken = (await getToken?.()) || token;
+      const activeToken = (await getToken?.()) || token || (typeof window !== 'undefined' ? localStorage.getItem('campusclimb_token') : null);
+      const headers = {
+        'Content-Type': 'multipart/form-data',
+        ...(activeToken ? { Authorization: `Bearer ${activeToken}` } : {}),
+      };
       const res = await axios.post(`${API_BASE_URL}/upload/notes`, formData, {
-        headers: { Authorization: `Bearer ${activeToken}`, 'Content-Type': 'multipart/form-data' },
+        headers,
         onUploadProgress: (e) => setNotesProgress(Math.round((e.loaded * 100) / e.total)),
       });
-      setNotesResult(res.data);
-      setCompletedSteps((prev) => ({ ...prev, 2: true }));
-      setCurrentStep(3);
+
+      const initialData = res.data;
+      if (initialData.status === 'COMPLETED') {
+        setNotesResult(initialData);
+        setCompletedSteps((prev) => ({ ...prev, 2: true }));
+        setCurrentStep(3);
+        setNotesStage('completed');
+        setNotesLoading(false);
+        return;
+      }
+
+      // If PROCESSING, poll the status endpoint until terminal outcome
+      const noteId = initialData.note_id;
+      if (!noteId) {
+        setNotesResult(initialData);
+        setCompletedSteps((prev) => ({ ...prev, 2: true }));
+        setCurrentStep(3);
+        setNotesLoading(false);
+        return;
+      }
+
+      setNotesStage(initialData.stage || 'extracting');
+
+      let pollAttempts = 0;
+      const maxPollAttempts = 150; // up to ~3 minutes
+      let pollDelay = 1000;
+
+      const pollStatus = async () => {
+        if (pollAttempts >= maxPollAttempts) {
+          setNotesError('Processing is taking longer than expected. It is continuing in the background; you can check the Dashboard shortly.');
+          setNotesLoading(false);
+          return;
+        }
+        pollAttempts++;
+
+        try {
+          const authHeaders = activeToken ? { Authorization: `Bearer ${activeToken}` } : {};
+          const statusRes = await axios.get(`${API_BASE_URL}/api/v1/upload/status/${noteId}`, { headers: authHeaders });
+          const statusData = statusRes.data;
+
+          if (statusData.status === 'COMPLETED') {
+            setNotesResult(statusData);
+            setCompletedSteps((prev) => ({ ...prev, 2: true }));
+            setCurrentStep(3);
+            setNotesStage('completed');
+            setNotesLoading(false);
+            return;
+          } else if (statusData.status === 'FAILED') {
+            setNotesError(statusData.error_message || 'Notes processing failed. Please check the file.');
+            setNotesStage('failed');
+            setNotesLoading(false);
+            return;
+          } else {
+            // Still processing: update stage text
+            setNotesStage(statusData.stage || 'indexing');
+            if (pollAttempts > 20) pollDelay = 2000;
+            activePollRef.current = setTimeout(pollStatus, pollDelay);
+          }
+        } catch (pollErr) {
+          if (pollErr.response?.status === 401 || pollErr.response?.status === 404) {
+            setNotesError(formatApiError(pollErr, 'Unable to verify upload status.'));
+            setNotesLoading(false);
+            return;
+          }
+          // Transient network hiccup: back off and retry
+          pollDelay = 3000;
+          activePollRef.current = setTimeout(pollStatus, pollDelay);
+        }
+      };
+
+      activePollRef.current = setTimeout(pollStatus, pollDelay);
+
     } catch (err) {
-      const apiErr = err.response?.data?.detail || 'Notes upload failed.';
-      setNotesError(typeof apiErr === 'string' ? apiErr : JSON.stringify(apiErr));
-    } finally {
+      setNotesError(formatApiError(err, 'Notes upload failed. Please check the file.'));
       setNotesLoading(false);
     }
   };
@@ -329,16 +467,19 @@ export default function Upload() {
     formData.append('year', pyqYear);
 
     try {
-      const activeToken = (await getToken?.()) || token;
+      const activeToken = (await getToken?.()) || token || (typeof window !== 'undefined' ? localStorage.getItem('campusclimb_token') : null);
+      const headers = {
+        'Content-Type': 'multipart/form-data',
+        ...(activeToken ? { Authorization: `Bearer ${activeToken}` } : {}),
+      };
       const res = await axios.post(`${API_BASE_URL}/upload/pyqs`, formData, {
-        headers: { Authorization: `Bearer ${activeToken}`, 'Content-Type': 'multipart/form-data' },
+        headers,
         onUploadProgress: (e) => setPyqProgress(Math.round((e.loaded * 100) / e.total)),
       });
       setPyqResult(res.data);
       setCompletedSteps((prev) => ({ ...prev, 3: true }));
     } catch (err) {
-      const apiErr = err.response?.data?.detail || 'PYQs upload failed.';
-      setPyqError(typeof apiErr === 'string' ? apiErr : JSON.stringify(apiErr));
+      setPyqError(formatApiError(err, 'PYQs upload failed. Please check the file.'));
     } finally {
       setPyqLoading(false);
     }
@@ -349,8 +490,19 @@ export default function Upload() {
     navigate(`/dashboard?subject=${encodeURIComponent(selectedSubject)}`);
   };
 
+  if (authLoading) {
+    return (
+      <div className="min-h-screen bg-[#0a0a0a] text-neutral-100 font-mono flex items-center justify-center">
+        <div className="flex flex-col items-center gap-3">
+          <RefreshCw className="w-6 h-6 text-teal-400 animate-spin" />
+          <span className="text-xs text-neutral-400 tracking-wider">Verifying authenticated session...</span>
+        </div>
+      </div>
+    );
+  }
+
   return (
-    <div className="min-h-screen bg-[#0a0a0a] text-neutral-100 font-mono flex flex-col">
+    <div className="app-workspace min-h-screen bg-[#0a0a0a] text-neutral-100 font-mono flex flex-col">
       {/* Header */}
       <header className="border-b border-neutral-800 bg-[#0a0a0a]/90 backdrop-blur-md px-3 sm:px-6 py-3 sm:py-4 flex items-center justify-between sticky top-0 z-50">
         <Link to="/" className="flex items-center gap-2 sm:gap-3 min-w-0">
@@ -430,7 +582,6 @@ export default function Upload() {
             ].map((step, idx) => {
               const isDone   = completedSteps[step.num];
               const isActive = currentStep === step.num;
-              const isLocked = step.num === 2 && !completedSteps[1];
 
               return (
                 <React.Fragment key={step.num}>
@@ -439,10 +590,10 @@ export default function Upload() {
                     initial={{ opacity: 0, y: -10 }}
                     animate={{ opacity: 1, y: 0 }}
                     transition={{ delay: idx * 0.08, duration: 0.3 }}
-                    onClick={() => !isLocked && setCurrentStep(step.num)}
-                    className={`flex-1 flex items-center gap-3 p-2.5 rounded-lg transition-all ${
-                      isLocked ? 'cursor-not-allowed opacity-50' : 'cursor-pointer'
-                    } ${isActive ? 'bg-teal-500/10 border border-teal-500/30' : ''}`}
+                    onClick={() => setCurrentStep(step.num)}
+                    className={`flex-1 flex items-center gap-3 p-2.5 rounded-lg transition-all cursor-pointer ${
+                      isActive ? 'bg-teal-500/10 border border-teal-500/30' : 'hover:bg-neutral-900/60'
+                    }`}
                   >
                     <div className="relative">
                       {isActive && (
@@ -461,7 +612,7 @@ export default function Upload() {
                             : 'bg-neutral-900 text-neutral-500 border border-neutral-800'
                         }`}
                       >
-                        {isDone ? <DrawCheckIcon /> : isLocked ? <Lock className="w-3.5 h-3.5" /> : step.num}
+                        {isDone ? <DrawCheckIcon /> : step.num}
                       </div>
                     </div>
 
@@ -654,6 +805,13 @@ export default function Upload() {
                 <span>Uploading notes under contributor account: <strong className="text-neutral-200">{user?.email || 'Student'}</strong></span>
               </div>
 
+              {!completedSteps[1] && (
+                <div className="p-3 bg-amber-500/10 border border-amber-500/30 rounded-lg text-xs text-amber-300 flex items-center gap-2">
+                  <Sparkles className="w-4 h-4 shrink-0 text-amber-400" />
+                  <span>Notes can be uploaded directly. Once a syllabus is provided, chunks are mapped into unit topics and mastery weights automatically.</span>
+                </div>
+              )}
+
               {!notesResult && (
                 <div className="space-y-4">
                   <UploadDropZone
@@ -661,6 +819,7 @@ export default function Upload() {
                     error={notesError}
                     loading={notesLoading}
                     progress={notesProgress}
+                    stageText={notesStage}
                     onFileSelected={(file, err) => { setNotesFile(file); setNotesError(err); }}
                   />
 
@@ -674,7 +833,7 @@ export default function Upload() {
                         className="w-full py-3 bg-teal-600 hover:bg-teal-500 disabled:opacity-50 text-white font-semibold text-xs rounded-lg transition-colors flex items-center justify-center gap-2 uppercase tracking-wider shadow-lg shadow-teal-600/20"
                       >
                         {notesLoading ? <RefreshCw className="w-4 h-4 animate-spin" /> : <Sparkles className="w-4 h-4" />}
-                        <span>{notesLoading ? 'Processing Notes...' : 'Upload & Deduplicate Notes'}</span>
+                        <span>{notesLoading ? (notesStage ? `Processing (${notesStage})...` : 'Processing Notes...') : 'Upload & Deduplicate Notes'}</span>
                       </button>
                     </div>
                   )}
@@ -683,6 +842,12 @@ export default function Upload() {
 
               {notesResult && (
                 <div className="space-y-4 bg-neutral-950 p-5 rounded-lg border border-teal-500/30">
+                  {notesResult.syllabus_warning && (
+                    <div className="p-3 bg-amber-500/10 border border-amber-500/30 rounded-lg text-xs text-amber-300 flex items-start gap-2">
+                      <AlertTriangle className="w-4 h-4 shrink-0 text-amber-400 mt-0.5" />
+                      <span>{notesResult.syllabus_warning} <button type="button" onClick={() => setCurrentStep(1)} className="underline ml-1 text-amber-400 hover:text-amber-300">Upload syllabus →</button></span>
+                    </div>
+                  )}
                   <div className="grid grid-cols-2 gap-4">
                     <div className="bg-neutral-900 p-4 rounded-lg border border-neutral-800 flex flex-col items-center justify-center">
                       <span className="text-2xl sm:text-3xl font-extrabold text-teal-400">
@@ -748,6 +913,13 @@ export default function Upload() {
                   Skip — go to Dashboard →
                 </button>
               </div>
+
+              {!completedSteps[1] && (
+                <div className="p-3 bg-neutral-900 border border-neutral-800 rounded-lg text-xs text-neutral-400 flex items-center gap-2">
+                  <Sparkles className="w-4 h-4 shrink-0 text-teal-400" />
+                  <span>PYQs can be uploaded at any time. Topic exam weights will be computed once a syllabus is available.</span>
+                </div>
+              )}
 
               {!pyqResult && (
                 <div className="space-y-4">
@@ -870,6 +1042,7 @@ export default function Upload() {
         )}
 
       </main>
+      <MobileNavigation subject={selectedSubject} />
     </div>
   );
 }

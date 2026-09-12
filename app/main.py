@@ -29,8 +29,11 @@ logging.basicConfig(
 logger = logging.getLogger("campusclimb")
 
 from app.database import engine, Base
-from app.models import Subject, SyllabusTopic, Note, NoteChunk, PYQ, TopicImportance  # noqa: F401
-from app.routers import auth, dashboard, upload, agent, tts
+from app.models import (  # noqa: F401
+    Subject, SyllabusTopic, Note, NoteChunk, PYQ, TopicImportance,
+    TopicProgress, QuizAttempt, StudyPlan,
+)
+from app.routers import auth, dashboard, upload, agent, tts, study
 from core.embeddings import get_embedding
 from config import MODEL_NAME
 
@@ -42,10 +45,14 @@ async def lifespan(app: FastAPI):
     """Create database tables, seed default subjects, execute schema migrations, and verify embedding model."""
     Base.metadata.create_all(bind=engine)
     with engine.connect() as conn:
+        is_mysql = engine.dialect.name == "mysql"
         # 1. Seed initial subjects
         defaults = ["Operating Systems", "DBMS", "Computer Networks", "Research"]
         for s in defaults:
-            conn.execute(text("INSERT IGNORE INTO subjects (name) VALUES (:name)"), {"name": s})
+            if is_mysql:
+                conn.execute(text("INSERT IGNORE INTO subjects (name) VALUES (:name)"), {"name": s})
+            else:
+                conn.execute(text("INSERT OR IGNORE INTO subjects (name) VALUES (:name)"), {"name": s})
         conn.commit()
 
         # 2. Schema migrations with fail-loud policy
@@ -53,7 +60,8 @@ async def lifespan(app: FastAPI):
         notes_cols = [c["name"] for c in insp.get_columns("notes")]
         if "subject_id" not in notes_cols:
             try:
-                conn.execute(text("ALTER TABLE notes ADD COLUMN subject_id INT NULL"))
+                column_type = "INT" if is_mysql else "INTEGER"
+                conn.execute(text(f"ALTER TABLE notes ADD COLUMN subject_id {column_type} NULL"))
                 conn.commit()
                 logger.info("Database migration: Added 'subject_id' column to 'notes'.")
             except Exception as e:
@@ -64,15 +72,37 @@ async def lifespan(app: FastAPI):
 
         # 3. Backfill subject_id for any existing notes
         try:
-            backfilled = conn.execute(text(
-                "UPDATE notes n JOIN subjects s ON n.subject = s.name SET n.subject_id = s.id WHERE n.subject_id IS NULL"
-            ))
+            if is_mysql:
+                backfilled = conn.execute(text(
+                    "UPDATE notes n JOIN subjects s ON n.subject = s.name SET n.subject_id = s.id WHERE n.subject_id IS NULL"
+                ))
+            else:
+                backfilled = conn.execute(text(
+                    "UPDATE notes SET subject_id = (SELECT id FROM subjects WHERE subjects.name = notes.subject) "
+                    "WHERE subject_id IS NULL"
+                ))
             conn.commit()
             unmapped = conn.execute(text("SELECT COUNT(*) FROM notes WHERE subject_id IS NULL")).scalar()
             logger.info("Database migration: Backfilled subject_id (updated: %d, remaining unmapped: %d).", backfilled.rowcount, unmapped)
         except Exception as e:
             logger.critical("Database migration FAILED: Unable to backfill subject_id: %s", e)
             raise RuntimeError(f"Database backfill failed: {e}") from e
+
+        # 4. Safe verification and creation of study engine tables
+        existing_tables = set(insp.get_table_names())
+        study_models = [TopicProgress, QuizAttempt, StudyPlan]
+        for model in study_models:
+            tbl = model.__tablename__
+            if tbl not in existing_tables:
+                try:
+                    model.__table__.create(bind=conn)
+                    conn.commit()
+                    logger.info("Database migration: Created study table '%s'.", tbl)
+                except Exception as e:
+                    logger.critical("Database migration FAILED: Unable to create table '%s': %s", tbl, e)
+                    raise RuntimeError(f"Database table creation failed for {tbl}: {e}") from e
+            else:
+                logger.info("Database migration: Study table '%s' verified.", tbl)
 
     os.makedirs(os.path.join(BASE_DIR, "..", "uploads"), exist_ok=True)
 
@@ -119,19 +149,20 @@ async def add_security_headers(request: Request, call_next):
         "img-src 'self' data: https:; "
         "script-src 'self' 'unsafe-inline'; "
         "style-src 'self' 'unsafe-inline'; "
-        "connect-src 'self' https:; "
+        "connect-src 'self' https: http://localhost:* http://127.0.0.1:* ws: wss:; "
         "frame-ancestors 'none';"
     )
     return response
 
 
 # CORS Configuration — restrict allowed origins explicitly
-cors_env = os.getenv("CORS_ORIGINS", "http://localhost:5173,http://127.0.0.1:5173,http://localhost:3000,http://127.0.0.1:3000")
+cors_env = os.getenv("CORS_ORIGINS", "http://localhost:5173,http://127.0.0.1:5173,http://localhost:3000,http://127.0.0.1:3000,http://localhost:5174,http://127.0.0.1:5174")
 allowed_origins = [origin.strip() for origin in cors_env.split(",") if origin.strip()]
 
 app.add_middleware(
     CORSMiddleware,
     allow_origins=allowed_origins,
+    allow_origin_regex=r"^https?://(localhost|127\.0\.0\.1)(:\d+)?$",
     allow_credentials=True,
     allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
     allow_headers=["Authorization", "Content-Type", "Accept", "X-Requested-With"],
@@ -148,3 +179,4 @@ app.include_router(upload.router)
 app.include_router(dashboard.router)
 app.include_router(agent.router)
 app.include_router(tts.router)
+app.include_router(study.router)

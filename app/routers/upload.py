@@ -16,19 +16,21 @@ Security hardening:
 - PII (student email) not logged
 """
 
+import hashlib
 import json
 import logging
 import os
 import re
 import shutil
 from collections import defaultdict
+from typing import Optional
 
-from fastapi import APIRouter, Depends, File, Form, HTTPException, Query, Request, UploadFile
+from fastapi import APIRouter, BackgroundTasks, Depends, File, Form, HTTPException, Query, Request, UploadFile
 from sqlalchemy.orm import Session
 
-from app.auth import get_current_user
-from app.database import get_db
-from app.models import Subject, SyllabusTopic, Note, NoteChunk, PYQ, TopicImportance
+from app.auth import get_current_user, get_current_user_optional
+from app.database import get_db, SessionLocal
+from app.models import Subject, SyllabusTopic, Note, NoteChunk, PYQ, TopicImportance, TopicProgress
 from app.rate_limiter import upload_rate_limiter
 from core.embeddings import batch_embed
 from core.syllabus_parser import parse_syllabus
@@ -36,7 +38,7 @@ from core.pdf_extractor import extract_text_from_pdf, chunk_text
 from core.topic_mapper import map_chunks_batch
 from core.deduplicator import deduplicate_chunks
 from core.pyq_analyzer import extract_questions_from_pdf, compute_topic_importance
-from core.note_formatter import format_and_clean_note
+from core.note_formatter import format_and_clean_note, clean_note_text_local
 
 logger = logging.getLogger(__name__)
 
@@ -64,6 +66,15 @@ def _sanitize_filename(raw: str) -> str:
     name = _SAFE_FILENAME_RE.sub("_", name)
     name = name[:200].strip() or "upload.pdf"
     return name
+
+
+def _compute_sha256(filepath: str) -> str:
+    """Compute SHA-256 hash of a file for deterministic duplicate detection."""
+    h = hashlib.sha256()
+    with open(filepath, "rb") as f:
+        while chunk := f.read(65536):
+            h.update(chunk)
+    return h.hexdigest()
 
 
 def _assert_size(file: UploadFile) -> None:
@@ -159,8 +170,8 @@ async def _compute_subject_status(subject: str, db: Session):
     topic_count = db.query(SyllabusTopic).filter(SyllabusTopic.subject == subject_clean).count()
     note_chunk_count = (
         db.query(NoteChunk)
-        .join(SyllabusTopic)
-        .filter(SyllabusTopic.subject == subject_clean)
+        .join(Note)
+        .filter(Note.subject == subject_clean)
         .count()
     )
     pyq_count = (
@@ -192,7 +203,7 @@ async def get_subject_status_path(subject: str, db: Session = Depends(get_db)):
 @router.get("/api/v1/subjects")
 async def get_subjects(
     db: Session = Depends(get_db),
-    _current_user: dict = Depends(get_current_user),
+    _current_user: Optional[dict] = Depends(get_current_user_optional),
 ):
     """Retrieve available subjects for the authenticated user.
 
@@ -200,7 +211,7 @@ async def get_subjects(
     protected and returns the authenticated user's own uploaded subjects alongside the
     active syllabus subjects to avoid exposing a global catalog to unauthenticated callers.
     """
-    user_id = _current_user.get("id")
+    user_id = _current_user.get("id") if _current_user else None
     user_subjects = []
     if user_id:
         user_subjects = [
@@ -235,13 +246,14 @@ async def get_subjects(
     return {"subjects": subject_names}
 
 
+@router.post("/api/v1/upload/syllabus")
 @router.post("/upload/syllabus")
 async def upload_syllabus(
     request: Request,
     file: UploadFile = File(...),
     subject: str = Form("Operating Systems"),
     db: Session = Depends(get_db),
-    _current_user: dict = Depends(get_current_user),
+    _current_user: Optional[dict] = Depends(get_current_user_optional),
 ):
     """Upload and parse a syllabus file.
 
@@ -271,6 +283,7 @@ async def upload_syllabus(
         ]
         if existing_topic_ids:
             db.query(TopicImportance).filter(TopicImportance.topic_id.in_(existing_topic_ids)).delete(synchronize_session=False)
+            db.query(TopicProgress).filter(TopicProgress.topic_id.in_(existing_topic_ids)).delete(synchronize_session=False)
             db.query(NoteChunk).filter(NoteChunk.matched_topic_id.in_(existing_topic_ids)).update(
                 {NoteChunk.matched_topic_id: None}, synchronize_session=False
             )
@@ -292,6 +305,25 @@ async def upload_syllabus(
             db.add(db_topic)
 
         db.commit()
+
+        # Check for any previously unmapped notes for this subject and align them
+        unmapped_chunks = (
+            db.query(NoteChunk)
+            .join(Note)
+            .filter(Note.subject == subject, NoteChunk.matched_topic_id.is_(None))
+            .all()
+        )
+        if unmapped_chunks:
+            new_topic_records = db.query(SyllabusTopic).filter(SyllabusTopic.subject == subject).all()
+            if new_topic_records:
+                topic_embeddings = [(t.id, json.loads(t.embedding)) for t in new_topic_records]
+                chunk_embeddings = [json.loads(c.embedding) if c.embedding else [0.0] * 768 for c in unmapped_chunks]
+                mappings = map_chunks_batch(chunk_embeddings, topic_embeddings)
+                for chunk, (topic_id, score) in zip(unmapped_chunks, mappings):
+                    chunk.matched_topic_id = topic_id
+                    chunk.similarity_score = round(score, 4)
+                db.commit()
+                logger.info("Auto-mapped %d previously unmapped note chunks to new syllabus", len(unmapped_chunks))
 
         unique_units = len(set(t["unit_number"] for t in topics))
         topic_names = [t["topic_name"] for t in topics]
@@ -320,134 +352,309 @@ async def upload_syllabus(
         _cleanup(filepath)
 
 
+def _process_note_pipeline(note_id: int, filepath: str, user_id: str, subject: str, student_name: str):
+    """Asynchronous background worker executing the full extraction, embedding, and indexing pipeline.
+
+    Guarantees a terminal status (COMPLETED or FAILED) on every execution path.
+    """
+    db = SessionLocal()
+    try:
+        note = db.query(Note).filter(Note.id == note_id).first()
+        if not note:
+            logger.error("[UploadWorker] Note #%d not found in database", note_id)
+            return
+
+        note.status = "PROCESSING"
+        note.stage = "extracting"
+        db.commit()
+
+        # Step 1: Extract text
+        logger.info("[UploadWorker] Note #%d: Starting text extraction for %s", note_id, note.original_filename)
+        text = extract_text_from_pdf(filepath)
+        if not text or not text.strip():
+            raise ValueError("No extractable text found in PDF. Scanned pages could not be recognized.")
+
+        # Step 2: Chunk text
+        note.stage = "chunking"
+        db.commit()
+        chunks = chunk_text(text)
+        if not chunks:
+            raise ValueError("No meaningful text chunks could be extracted from the PDF.")
+
+        note.chunk_count = len(chunks)
+        db.commit()
+        logger.info("[UploadWorker] Note #%d: Extracted %d chunks", note_id, len(chunks))
+
+        # Step 3: Embeddings
+        raw_count = len(chunks)
+        unique_normalized = set(" ".join(c.strip().split()) for c in chunks if c.strip())
+        unique_count = len(unique_normalized)
+        exact_dupes_removed = max(0, raw_count - unique_count)
+        logger.info(
+            "[UploadWorker] Note #%d: Chunk embedding plan: raw chunks (%d) -> exact duplicates removed (%d) -> final embedding count (%d)",
+            note_id,
+            raw_count,
+            exact_dupes_removed,
+            unique_count,
+        )
+
+        note.stage = "embedding"
+        db.commit()
+        chunk_embeddings = batch_embed(chunks, batch_size=64)
+        logger.info("[UploadWorker] Note #%d: Generated %d embeddings", note_id, len(chunk_embeddings))
+
+        # Step 4: Indexing & topic mapping
+        note.stage = "indexing"
+        db.commit()
+
+        topic_records = db.query(SyllabusTopic).filter(SyllabusTopic.subject == subject).all()
+        if topic_records:
+            topic_embeddings = [(t.id, json.loads(t.embedding)) for t in topic_records]
+            mappings = map_chunks_batch(chunk_embeddings, topic_embeddings)
+        else:
+            mappings = [(None, 0.0) for _ in chunks]
+
+        # Bulk insert chunks efficiently via bulk_save_objects
+        db_chunks = []
+        for chunk_text_str, embedding, (topic_id, sim_score) in zip(chunks, chunk_embeddings, mappings):
+            db_chunks.append(
+                NoteChunk(
+                    note_id=note.id,
+                    chunk_text=chunk_text_str,
+                    embedding=json.dumps(embedding),
+                    matched_topic_id=topic_id,
+                    similarity_score=round(sim_score, 4),
+                )
+            )
+        db.bulk_save_objects(db_chunks)
+        db.commit()
+        logger.info("[UploadWorker] Note #%d: Saved %d chunks to database via bulk operation", note_id, len(db_chunks))
+
+        # Cumulative deduplication
+        _run_deduplication(db, user_id=user_id, subject=subject)
+
+        # Terminal success
+        note = db.query(Note).filter(Note.id == note_id).first()
+        if note:
+            note.status = "COMPLETED"
+            note.stage = "completed"
+            note.error_message = None
+            db.commit()
+        logger.info("[UploadWorker] Note #%d: Successfully completed pipeline", note_id)
+
+    except Exception as exc:
+        logger.exception("[UploadWorker] Note #%d processing failed: %s", note_id, exc)
+        db.rollback()
+        try:
+            note = db.query(Note).filter(Note.id == note_id).first()
+            if note:
+                note.status = "FAILED"
+                note.stage = "failed"
+                note.error_message = str(exc) or "Error processing PDF document."
+                db.commit()
+        except Exception as inner_exc:
+            logger.error("[UploadWorker] Failed to record FAILED status for Note #%d: %s", note_id, inner_exc)
+    finally:
+        db.close()
+        _cleanup(filepath)
+
+
+@router.post("/api/v1/upload/notes")
 @router.post("/upload/notes")
 async def upload_notes(
     request: Request,
+    background_tasks: BackgroundTasks,
     file: UploadFile = File(...),
     student_name: str = Form(...),
     subject: str = Form("Operating Systems"),
+    sync: bool = Query(False),
     db: Session = Depends(get_db),
-    _current_user: dict = Depends(get_current_user),
+    _current_user: Optional[dict] = Depends(get_current_user_optional),
 ):
     """Upload a student note PDF.
 
-    Pipeline: extract text → chunk → embed → map to topics → deduplicate.
-    Returns chunk count, topic breakdown dict, and deduplicated chunk count.
+    Saves the file, validates format and size, checks for identical hashes,
+    initializes the Note in PROCESSING state, and dispatches background processing.
     """
     upload_rate_limiter.check(request)
     _assert_size(file)
     subject = _validate_subject(subject, db)
 
     filepath = _save_temp_file(file)
-    logger.info("Notes upload started: subject=%s filename=%s", subject, _sanitize_filename(file.filename or ""))
+    safe_filename = _sanitize_filename(file.filename or "upload.pdf")
+    user_id = _current_user.get("id") if _current_user else "guest_user"
 
-    try:
-        # Validate subject exists in DB (single source of truth)
-        topic_records = (
-            db.query(SyllabusTopic).filter(SyllabusTopic.subject == subject).all()
+    file_hash = _compute_sha256(filepath)
+
+    # Check for duplicate file already uploaded by this user for this subject
+    existing_note = (
+        db.query(Note)
+        .filter(
+            Note.user_id == user_id,
+            Note.subject == subject,
+            Note.file_hash == file_hash,
         )
-        logger.debug("Step 1 - Found %d syllabus topics for subject '%s'", len(topic_records), subject)
-        if not topic_records:
-            logger.warning("No syllabus topics found for subject '%s' — rejecting notes upload", subject)
-            raise HTTPException(
-                status_code=400,
-                detail=f"Please upload a syllabus for '{subject}' first before uploading notes.",
+        .order_by(Note.id.desc())
+        .first()
+    )
+
+    if existing_note:
+        if existing_note.status == "COMPLETED":
+            _cleanup(filepath)
+            logger.info("Identical file already processed (Note #%d, hash=%s). Returning existing result.", existing_note.id, file_hash)
+            # Fetch breakdown
+            chunks = (
+                db.query(NoteChunk, SyllabusTopic.topic_name)
+                .outerjoin(SyllabusTopic, NoteChunk.matched_topic_id == SyllabusTopic.id)
+                .filter(NoteChunk.note_id == existing_note.id)
+                .all()
             )
+            t_counts = defaultdict(int)
+            dedup_count = 0
+            for chunk, topic_name in chunks:
+                t_counts[topic_name or "Unmapped"] += 1
+                if not chunk.is_representative:
+                    dedup_count += 1
+            return {
+                "note_id": existing_note.id,
+                "status": "COMPLETED",
+                "stage": "completed",
+                "subject": subject,
+                "filename": existing_note.original_filename,
+                "chunk_count": existing_note.chunk_count,
+                "topic_breakdown": dict(t_counts),
+                "deduplicated": dedup_count,
+                "already_processed": True,
+                "message": "Document was already uploaded and indexed.",
+            }
+        elif existing_note.status == "PROCESSING":
+            _cleanup(filepath)
+            logger.info("Identical file is currently processing (Note #%d, hash=%s).", existing_note.id, file_hash)
+            return {
+                "note_id": existing_note.id,
+                "status": "PROCESSING",
+                "stage": existing_note.stage,
+                "subject": subject,
+                "filename": existing_note.original_filename,
+                "message": "Document is currently being processed.",
+            }
 
-        # Extract and chunk text
-        text = extract_text_from_pdf(filepath)
-        logger.debug("Step 2 - Extracted %d chars of raw text", len(text))
-
-        chunks = chunk_text(text)
-        logger.debug("Step 3 - Extracted %d chunks", len(chunks))
-
-        if not chunks:
-            raise HTTPException(
-                status_code=400,
-                detail="No meaningful text chunks could be extracted from the PDF.",
-            )
-
-        # Embed all chunks in batch
-        chunk_embeddings = batch_embed(chunks)
-        logger.debug("Step 4 - Generated %d embeddings", len(chunk_embeddings))
-
-        # Prepare topic embeddings for mapping
-        topic_embeddings = [(t.id, json.loads(t.embedding)) for t in topic_records]
-
-        # Map each chunk to nearest topic
-        mappings = map_chunks_batch(chunk_embeddings, topic_embeddings)
-        logger.debug("Step 5 - Mapped %d chunks to topics", len(mappings))
-
-        # Look up subject_id
-        subject_record = db.query(Subject).filter(Subject.name == subject).first()
-        subject_id = subject_record.id if subject_record else None
-
-        # Save note record
-        user_id = _current_user.get("id")
-        note = Note(
-            user_id=user_id,
-            student_name=student_name,
-            subject=subject,
-            subject_id=subject_id,
-            original_filename=_sanitize_filename(file.filename or "upload.pdf"),
-        )
-        db.add(note)
+    # Look up or create subject record
+    subject_record = db.query(Subject).filter(Subject.name == subject).first()
+    if not subject_record:
+        subject_record = Subject(name=subject)
+        db.add(subject_record)
         db.flush()
-        logger.debug("Step 6 - Created Note record with ID: %d", note.id)
+    subject_id = subject_record.id
 
-        topic_id_map = {t.id: t.topic_name for t in topic_records}
-        topic_breakdown = defaultdict(int)
+    # Create Note record in PROCESSING state
+    note = Note(
+        user_id=user_id,
+        student_name=student_name,
+        subject=subject,
+        subject_id=subject_id,
+        original_filename=safe_filename,
+        file_hash=file_hash,
+        status="PROCESSING",
+        stage="extracting",
+    )
+    db.add(note)
+    db.commit()
+    db.refresh(note)
 
-        # Save note chunks
-        for chunk_text_str, embedding, (topic_id, sim_score) in zip(
-            chunks, chunk_embeddings, mappings
-        ):
-            db_chunk = NoteChunk(
-                note_id=note.id,
-                chunk_text=chunk_text_str,
-                embedding=json.dumps(embedding),
-                matched_topic_id=topic_id,
-                similarity_score=round(sim_score, 4),
-            )
-            db.add(db_chunk)
-            topic_name = topic_id_map.get(topic_id, "General Concept")
-            topic_breakdown[topic_name] += 1
+    logger.info("Notes upload accepted: note_id=%d subject=%s filename=%s hash=%s", note.id, subject, safe_filename, file_hash)
 
-        db.commit()
-        logger.info("Step 7 - Committed Note #%d and %d NoteChunks", note.id, len(chunks))
-
-        # Run cumulative deduplication across ALL chunks for this user and subject
-        _run_deduplication(db, user_id=user_id, subject=subject)
-        logger.debug("Step 8 - Cumulative per-user deduplication complete")
-
-        # Count deduplicated (non-representative) chunks for this user and subject
-        dedup_count = (
-            db.query(NoteChunk)
-            .join(Note)
-            .filter(
-                Note.user_id == user_id,
-                Note.subject == subject,
-                NoteChunk.is_representative == False,
-            )
-            .count()
+    if sync:
+        _process_note_pipeline(note.id, filepath, user_id, subject, student_name)
+        db.refresh(note)
+        chunks = (
+            db.query(NoteChunk, SyllabusTopic.topic_name)
+            .outerjoin(SyllabusTopic, NoteChunk.matched_topic_id == SyllabusTopic.id)
+            .filter(NoteChunk.note_id == note.id)
+            .all()
         )
-
+        t_counts = defaultdict(int)
+        dedup_count = 0
+        for chunk, topic_name in chunks:
+            t_counts[topic_name or "Unmapped"] += 1
+            if not chunk.is_representative:
+                dedup_count += 1
         return {
+            "note_id": note.id,
             "subject": subject,
-            "chunk_count": len(chunks),
-            "topic_breakdown": dict(topic_breakdown),
+            "status": note.status,
+            "stage": note.stage,
+            "chunk_count": note.chunk_count,
+            "topic_breakdown": dict(t_counts),
             "deduplicated": dedup_count,
+            "error_message": note.error_message,
+        }
+    else:
+        background_tasks.add_task(
+            _process_note_pipeline,
+            note.id,
+            filepath,
+            user_id,
+            subject,
+            student_name,
+        )
+        return {
+            "note_id": note.id,
+            "status": "PROCESSING",
+            "stage": "extracting",
+            "subject": subject,
+            "filename": note.original_filename,
+            "message": "Upload accepted and processing started in background.",
         }
 
-    except HTTPException:
-        raise
-    except Exception as e:
-        logger.exception("Notes processing error for subject=%s", subject)
-        raise HTTPException(status_code=400, detail="Error processing notes. Please check the file format.")
-    finally:
-        _cleanup(filepath)
+
+@router.get("/api/v1/upload/status/{note_id}")
+@router.get("/upload/status/{note_id}")
+async def get_note_upload_status(
+    note_id: int,
+    db: Session = Depends(get_db),
+    _current_user: Optional[dict] = Depends(get_current_user_optional),
+):
+    """Retrieve the real-time processing status of an uploaded note."""
+    note = db.query(Note).filter(Note.id == note_id).first()
+    if not note:
+        raise HTTPException(status_code=404, detail="Note not found.")
+
+    user_id = _current_user.get("id") if _current_user else None
+    if user_id and note.user_id and note.user_id not in (user_id, "guest_user"):
+        raise HTTPException(status_code=403, detail="Access denied.")
+
+    topic_breakdown = {}
+    dedup_count = 0
+    if note.status == "COMPLETED":
+        chunks = (
+            db.query(NoteChunk, SyllabusTopic.topic_name)
+            .outerjoin(SyllabusTopic, NoteChunk.matched_topic_id == SyllabusTopic.id)
+            .filter(NoteChunk.note_id == note.id)
+            .all()
+        )
+        t_counts = defaultdict(int)
+        for chunk, topic_name in chunks:
+            t_counts[topic_name or "Unmapped"] += 1
+            if not chunk.is_representative:
+                dedup_count += 1
+        topic_breakdown = dict(t_counts)
+
+    return {
+        "note_id": note.id,
+        "filename": note.original_filename,
+        "subject": note.subject,
+        "status": note.status,
+        "stage": note.stage,
+        "error_message": note.error_message,
+        "chunk_count": note.chunk_count,
+        "page_count": note.page_count,
+        "topic_breakdown": topic_breakdown,
+        "deduplicated": dedup_count,
+    }
 
 
+@router.post("/api/v1/upload/pyqs")
 @router.post("/upload/pyqs")
 async def upload_pyqs(
     request: Request,
@@ -455,7 +662,7 @@ async def upload_pyqs(
     year: int = Form(...),
     subject: str = Form("Operating Systems"),
     db: Session = Depends(get_db),
-    _current_user: dict = Depends(get_current_user),
+    _current_user: Optional[dict] = Depends(get_current_user_optional),
 ):
     """Upload a PYQ PDF.
 
@@ -619,7 +826,10 @@ def _run_deduplication(db: Session, user_id: str = None, subject: str = None):
         # If chunk is designated representative and does not yet have cleaned_text, clean it
         if is_rep and not db_chunk.cleaned_text:
             try:
-                cleaned, diagram = format_and_clean_note(db_chunk.chunk_text)
+                # Fast deterministic local cleaning in critical ingestion path (zero external network latency)
+                cleaned = clean_note_text_local(db_chunk.chunk_text)
+                diagram = None
+
                 if cleaned:
                     db_chunk.cleaned_text = cleaned
                     db_chunk.diagram_mermaid = diagram
